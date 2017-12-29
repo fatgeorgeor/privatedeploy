@@ -25,7 +25,7 @@ SSHDIR = USERHOME + '/.ssh'
 SSHPRIFILE = SSHDIR + '/id_rsa'
 SSHPUBFILE = SSHDIR + '/id_rsa.pub'
 AUTHORIZEDKEYFILE = SSHDIR + '/authorized_keys'
-DEPLOYDIR = USERHOME + '/cephdeploy'
+DEPLOYDIR = '/opt/cephdeploy'
 
 SAMBA_CONFIG_TEMPLATE = '''[{{ mountpoint }}]
         path = /{{ mountpoint }}
@@ -267,6 +267,8 @@ def PrepareCephfs():
 def all_configctdb():
     sudo('systemctl disable smb')
     sudo('systemctl disable nfs')
+    put('smb.conf', '/etc/samba/smb.conf', use_sudo=True)
+    sudo('echo -n > /etc/exports')
     sudo("sudo rm  /etc/ctdb/public_addresses /etc/ctdb/nodes -f") 
     sudo("echo %s ctdb  >> /etc/hosts" % USERDEINEDCONFIG['vip'])
     sudo("echo %s/24  %s > /etc/ctdb/public_addresses" %(USERDEINEDCONFIG['vip'], USERDEINEDCONFIG['vip_nic'])) 
@@ -478,7 +480,7 @@ def ChangeIp():
             execute(changemonitorconfig)
             execute(startcephservice)
             execute(startctdbservice)
-            execute(updateconfigfile)
+            execute(updateconfigfile, oconfig=oconfig)
     
 # -------- functions to change monitor ip end------------------------------#
 
@@ -574,4 +576,4 @@ if __name__ == "__main__":
     DeployOsds()
     PrepareCephfs()
     StartCtdb() 
-    AddOneExporter('wuxingyi')
+    AddOneExporter('test')
