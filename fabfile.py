@@ -341,10 +341,12 @@ def AddOneExporter(dirname):
 
 
 # -------- functions to change monitor ip begin------------------------------#
-def loadChangeIpConfig():
+def loadNewConfig():
     config = loadConfiguration('changeipconfig.json')
     user = USERDEINEDCONFIG['user'] = config["user"]
     password = USERDEINEDCONFIG['password'] = config["password"]
+    USERDEINEDCONFIG['newvip'] = config["newvip"]
+    USERDEINEDCONFIG['newvip_nic'] = config["newvip_nic"]
 
     env.roledefs['newmonitors'] = config["newmonitors"]
     env.roledefs['newosdnodes'] = config["newosdnodes"]
@@ -424,8 +426,8 @@ def modifyhostsandctdbconfigs():
         append('/etc/hosts', ip + " " + hostname, use_sudo=True)
         append('/etc/ctdb/nodes', ip, use_sudo=True)
     sudo('sed -i "/ctdb/d" /etc/hosts')
-    append('/etc/hosts', USERDEINEDCONFIG['vip'] + " ctdb", use_sudo=True)
-    sudo("echo %s/24  %s > /etc/ctdb/public_addresses" %(USERDEINEDCONFIG['vip'], USERDEINEDCONFIG['vip_nic'])) 
+    append('/etc/hosts', USERDEINEDCONFIG['newvip'] + " ctdb", use_sudo=True)
+    sudo("echo %s/24  %s > /etc/ctdb/public_addresses" %(USERDEINEDCONFIG['newvip'], USERDEINEDCONFIG['newvip_nic'])) 
 
 @parallel
 @roles('newmonitors')
@@ -443,10 +445,29 @@ def changemonitorconfig():
             print("injecter monmap")
             sudo('ceph-mon -i ' + myhostname + ' --inject-monmap /tmp/monmap')
 
+@parallel
+@roles('allnodes')
+def updateconfigfile(oconfig):
+    oconfig['monitors'] = env.roledefs['newmonitors']
+    oconfig['osdnodes'] = env.roledefs['newosdnodes']
+    oconfig['vip'] = USERDEINEDCONFIG['newvip']
+    oconfig['vip_nic'] = USERDEINEDCONFIG['newvip_nic']
+
+    f=open('config.json.new', 'w')
+    json.dump(oconfig, f, indent=2)
+    f.close()
+    put('config.json.new', DEPLOYDIR + '/config.json')
+
+def loadOldConfig():
+    return loadConfiguration('config.json')
 
 
 def ChangeIp():
-    loadChangeIpConfig()
+    loadNewConfig()
+    oconfig = loadOldConfig()
+    if len(oconfig['monitors']) != len(env.roledefs['newmonitors']) \
+        or len(oconfig['osdnodes']) != len(env.roledefs['newosdnodes']):
+        print("must have same size of monitors and osds")
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(stopctdbservice)
