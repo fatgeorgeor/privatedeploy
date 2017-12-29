@@ -367,8 +367,8 @@ def loadNewConfig():
         print "please provide at lease one monitor"
         exit(-1)
 
-    USERDEINEDCONFIG['vip'] = config["vip"]
-    USERDEINEDCONFIG['vip_nic'] = config["vip_nic"]
+    USERDEINEDCONFIG['vip'] = config["newvip"]
+    USERDEINEDCONFIG['vip_nic'] = config["newvip_nic"]
 
 
 
@@ -478,6 +478,7 @@ def ChangeIp():
             execute(changemonitorconfig)
             execute(startcephservice)
             execute(startctdbservice)
+            execute(updateconfigfile)
     
 # -------- functions to change monitor ip end------------------------------#
 
