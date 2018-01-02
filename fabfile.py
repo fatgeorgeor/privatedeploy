@@ -67,6 +67,11 @@ def all_systemconfig():
     sudo('sed -i "/ctdb/d" /etc/hosts')
 
 @parallel
+@roles('osds')
+def osd_updatecephdisk():
+    put('resoures/main.py', '/usr/lib/python2.7/site-packages/ceph_disk/main.py', use_sudo=True)
+
+@parallel
 @roles('allnodes')
 def all_sshnopassword():
     deploynodekey = read_key_file(SSHPUBFILE)
@@ -129,6 +134,7 @@ def Init():
         execute(all_sshnopassword)
         with settings(warn_only=True):
             execute(all_systemconfig)
+            execute(osd_updatecephdisk)
 
 
 # -------- functions deploy osds begin------------------------------#
@@ -267,7 +273,7 @@ def PrepareCephfs():
 def all_configctdb():
     sudo('systemctl disable smb')
     sudo('systemctl disable nfs')
-    put('smb.conf', '/etc/samba/smb.conf', use_sudo=True)
+    put('resoures/smb.conf', '/etc/samba/smb.conf', use_sudo=True)
     sudo('echo -n > /etc/exports')
     sudo("sudo rm  /etc/ctdb/public_addresses /etc/ctdb/nodes -f") 
     sudo("echo %s ctdb  >> /etc/hosts" % USERDEINEDCONFIG['vip'])
@@ -286,9 +292,9 @@ def all_preparecephfs():
     sudo('rm -f /etc/ctdb/mountcephfs.sh && touch /etc/ctdb/mountcephfs.sh')
     sudo('chmod +x /etc/ctdb/mountcephfs.sh')
     append('/etc/ctdb/mountcephfs.sh', content, use_sudo=True)
-    put('ctdbd.conf', '/etc/ctdb/', use_sudo=True)
-    put('ctdb.service', '/usr/lib/systemd/system/ctdb.service', use_sudo=True)
-    put('nfs', '/etc/sysconfig/nfs', use_sudo=True)
+    put('resoures/ctdbd.conf', '/etc/ctdb/', use_sudo=True)
+    put('resoures/ctdb.service', '/usr/lib/systemd/system/ctdb.service', use_sudo=True)
+    put('resoures/nfs', '/etc/sysconfig/nfs', use_sudo=True)
     sudo('systemctl daemon-reload') 
 
 
