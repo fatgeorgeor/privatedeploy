@@ -670,6 +670,21 @@ def TiDB():
 
 # TiDB end
 
+@roles("allnodes")
+def Prometheus_node():
+            put('resoures/prometheus.yaml', '/etc/prometheus/', use_sudo=True)
+            put('resoures/node_targets.yaml', '/etc/prometheus/', use_sudo=True)
+            for ip in USERDEINEDCONFIG['ips']: 
+                sudo("echo '" + "    - \"" + ip + ":9100\"' >> /etc/prometheus/node_targets.yaml");
+
+def Prometheus():
+    print "Configure Prometheus"
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(Prometheus_node)
+
+    print "Configure Prometheus end"
+
 if __name__ == "__main__":
     Init()
     SetNtpServer(ip=USERDEINEDCONFIG['ntpserverip'])
@@ -684,3 +699,4 @@ if __name__ == "__main__":
     StartCtdb() 
     AddOneExporter('test')
     TiDB()
+    Prometheus()
