@@ -9,6 +9,7 @@ import os
 import json
 import copy
 import pdb
+import re
 from jinja2 import Template
 
 # note:
@@ -116,6 +117,11 @@ def LoadConfig():
     USERDEINEDCONFIG['monitorhostnames'] = ''
     USERDEINEDCONFIG['monitorhostnames_sep'] = ''
     USERDEINEDCONFIG['allnodehostnames'] = ''
+    USERDEINEDCONFIG['pd_peer'] = ''
+    USERDEINEDCONFIG['pd_client_tikv'] = ''
+    USERDEINEDCONFIG['pd_client_tidb'] = ''
+    USERDEINEDCONFIG['pd_name'] = []
+    USERDEINEDCONFIG['ips'] = config["osdnodes"]
 
     counter = 0
     for i in env.roledefs["allnodes"]:
@@ -126,6 +132,27 @@ def LoadConfig():
         counter = counter + 1
     USERDEINEDCONFIG['monitorhostnames_sep'] = USERDEINEDCONFIG['monitorhostnames_sep'].strip(',')
 
+    counter = 0
+    for i in env.roledefs["allnodes"]:
+        if i in config["monitors"]:
+            USERDEINEDCONFIG['pd_peer'] += "pd" + str(counter) + "=http://" + str(i) + ":2380,"
+            USERDEINEDCONFIG['pd_client_tikv'] += "\"" + str(i) + ":2379\","
+            USERDEINEDCONFIG['pd_client_tidb'] += str(i) + ":2379,"
+            USERDEINEDCONFIG['pd_name'].append("pd" + str(counter))
+
+        counter = counter + 1
+
+    USERDEINEDCONFIG['tidb_deploy'] = "/home/tidb/deploy"
+    USERDEINEDCONFIG['pd_conf'] = USERDEINEDCONFIG['tidb_deploy'] + "/conf/pd.toml"
+    USERDEINEDCONFIG['tikv_conf'] = USERDEINEDCONFIG['tidb_deploy'] + "/conf/tikv.toml"
+    USERDEINEDCONFIG['tidb_conf'] = USERDEINEDCONFIG['tidb_deploy'] + "/conf/tidb.toml"
+    systemd_conf="/etc/systemd/system"
+    USERDEINEDCONFIG['pd_service'] = systemd_conf + "/pd.service"
+    USERDEINEDCONFIG['tidb_service'] = systemd_conf + "/tidb-4000.service"
+    USERDEINEDCONFIG['tikv_service'] = systemd_conf + "/tikv-20160.service"
+    print USERDEINEDCONFIG['pd_name']
+    print USERDEINEDCONFIG['pd_client_tikv']
+    print USERDEINEDCONFIG['pd_client_tidb']
 
 def Init():
     LoadConfig()
@@ -568,7 +595,80 @@ def SetNtpServer(ip):
             execute(setNtp, ip=ip)
 # -------- functions to add new disk as new osd end ------------------------------#
 
+# TiDB
+@roles("allnodes")
+def TiDB_shutdown():
+    print "shutdown tidb, tikv, pd"
+    file=USERDEINEDCONFIG['tidb_conf']
+    num=run('hostname -s')[-1]
+    num=int(num)
+    sudo("killall tidb-server")
+    sudo("killall tikv-server")
+    sudo("killall pd-server")
+    print "sshutdown tidb: " + str(num) + " end"
 
+@roles("allnodes")
+def TiDB_pd():
+    print "configure tidb placement driver"
+    file=USERDEINEDCONFIG['pd_conf']
+    num=run('hostname -s')[-1]
+    num=int(num)
+    #name = "pdX" 
+    sudo("sed -ibak 's/^name\ *=\ *\"pd.*\"$/name = \"" + USERDEINEDCONFIG['pd_name'][num] + "\"/g' " + file)
+    #client-urls = "http://XXX.XXX.XXX.XXX:2379"
+    sudo("sed -ibak 's/^client-urls\ *=\ *\"http:\/\/.*:2379\"$/client-urls = \"http:\/\/" + USERDEINEDCONFIG['ips'][num] + ":2379\"/g' " + file)
+    #advertise-client-urls = "http://XXX.XXX.XXX.XXX:2379"
+    sudo("sed -ibak 's/^advertise-client-urls\ *=\ *\"http:\/\/.*:2379\"$/advertise-client-urls = \"http:\/\/" + USERDEINEDCONFIG['ips'][num] + ":2379\"/g' " + file)
+    #peer-urls = "http://XXX.XXX.XXX.XXX:2380"
+    sudo("sed -ibak 's/^peer-urls\ *=\ *\"http:\/\/.*:2380\"$/peer-urls = \"http:\/\/" + USERDEINEDCONFIG['ips'][num] + ":2380\"/g' " + file)
+    #advertise-peer-urls = "http://XXX.XXX.XXX.XXX:2380"
+    sudo("sed -ibak 's/^advertise-peer-urls\ *=\ *\"http:\/\/.*:2380\"$/advertise-peer-urls = \"http:\/\/" + USERDEINEDCONFIG['ips'][num] + ":2380\"/g' " + file)
+    #initial-cluster="pd1=http://XXX.XXX.XXX.XXA:2380,pd2=http://XXX.XXX.XXX.XXB:2380,pd3=http://XXX.XXX.XXX.XXC:2380"
+    sudo("sed -ibak 's/^\(initial-cluster\ *=\ *\)\".*\"/\\1\"" + re.escape(repr(USERDEINEDCONFIG['pd_peer'])[1:-1]).replace('\\\\', '\\') + "\"/g' " + file)
+
+    sudo("systemctl restart " + "`basename " + USERDEINEDCONFIG['pd_service'] + "`")
+    sudo("sleep 2")
+    print "start pd: " + str(num) + " end"
+
+@roles("allnodes")
+def TiDB_tikv():
+    print "configure TiKV(key value for TiDB)"
+    file=USERDEINEDCONFIG['tikv_conf']
+    num=run('hostname -s')[-1]
+    num=int(num)
+    #advertise-addr = "XXX.XXX.XXX.XXX:20160"
+    sudo("sed -ibak 's/^advertise-addr\ *=\ *\".*:20160\"$/advertise-addr = \"" + USERDEINEDCONFIG['ips'][num] + ":20160\"/g' " + file)
+    #endpoints = ["XXX.XXX.XXX.XXA:2379","XXX.XXX.XXX.XXB:2379","XXX.XXX.XXX.XXC:2379"]
+    sudo("sed -ibak 's/^endpoints = .*$/endpoints = [" + USERDEINEDCONFIG['pd_client_tikv'][0:-1] + "]/g' " + file)
+
+    sudo("systemctl restart " + "`basename " + USERDEINEDCONFIG['tikv_service'] + "`")
+    sudo("sleep 2")
+    print "start tikv: " + str(num) + " end"
+
+@roles("allnodes")
+def TiDB_tidb():
+    print "configure TiDB itself"
+    file=USERDEINEDCONFIG['tidb_conf']
+    num=run('hostname -s')[-1]
+    num=int(num)
+    #path = "XXX.XXX.XXX.XXA:2379,XXX.XXX.XXX.XXB:2379,XXX.XXX.XXX.XXB:2379"
+    sudo("sed -ibak 's/^path = \".*\"$/path = \"" + USERDEINEDCONFIG['pd_client_tidb'][0:-1] + "\"/g' " + file)
+
+    sudo("systemctl restart " + "`basename " + USERDEINEDCONFIG['tidb_service'] + "`")
+    sudo("sleep 2")
+    print "start tidb: " + str(num) + " end"
+
+def TiDB():
+    print "Configure TiDB"
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(TiDB_shutdown)
+            execute(TiDB_pd)
+            execute(TiDB_tikv)
+            execute(TiDB_tidb)
+    print "Configure TiDB end"
+
+# TiDB end
 
 if __name__ == "__main__":
     Init()
@@ -576,10 +676,11 @@ if __name__ == "__main__":
     StopCtdbIfAny()
     UpdateHosts()
 
-    ## only after ceph and smb installed can we add user
+    # only after ceph and smb installed can we add user
     AddUser()
     CreateMonMgrMds()
     DeployOsds()
     PrepareCephfs()
     StartCtdb() 
     AddOneExporter('test')
+    TiDB()
