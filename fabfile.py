@@ -677,6 +677,8 @@ def Prometheus_node():
             for ip in USERDEINEDCONFIG['ips']: 
                 sudo("echo '" + "    - \"" + ip + ":9100\"' >> /etc/prometheus/node_targets.yaml");
 
+            sudo("systemctl restart prometheus");
+
 def Prometheus():
     print "Configure Prometheus"
     with settings(warn_only=True):
