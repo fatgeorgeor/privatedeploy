@@ -2,7 +2,7 @@
     "monitors": ["192.168.122.76", "192.168.122.59", "192.168.122.246"],
     "osdnodes": ["192.168.122.76", "192.168.122.59", "192.168.122.246"],
     "user":  "root",
-    "password":  "linux",
+    "password":  "Eking1234!",
     "clusterinfo":  "bj-beishu-cluster",
     "ntpserverip":  "10.70.140.20",
     "vip":  "192.168.122.176",
