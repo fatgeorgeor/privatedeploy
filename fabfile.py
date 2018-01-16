@@ -134,7 +134,7 @@ def LoadConfig():
 
     counter = 0
     for i in env.roledefs["allnodes"]:
-        if i in config["monitors"]:
+        if i in USERDEINEDCONFIG['ips']:
             USERDEINEDCONFIG['pd_peer'] += "pd" + str(counter) + "=http://" + str(i) + ":2380,"
             USERDEINEDCONFIG['pd_client_tikv'] += "\"" + str(i) + ":2379\","
             USERDEINEDCONFIG['pd_client_tidb'] += str(i) + ":2379,"
