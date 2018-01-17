@@ -163,6 +163,23 @@ def Init():
             execute(all_systemconfig)
             execute(osd_updatecephdisk)
 
+@roles('allnodes')
+def check_disk_available():
+    for disk in USERDEINEDCONFIG['disks']:
+        result = run("lsblk " + disk);
+        if result.return_code == 0: 
+            pass
+        elif result.return_code == 1: 
+            print env.host_string + " disk: " + disk + " does not exist. exit" 
+            raise SystemExit()
+        else: #print error to user
+            print result
+            raise SystemExit()
+
+def Check():
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(check_disk_available)
 
 # -------- functions deploy osds begin------------------------------#
 @parallel
@@ -689,6 +706,7 @@ def Prometheus():
 
 if __name__ == "__main__":
     Init()
+    Check()
     SetNtpServer(ip=USERDEINEDCONFIG['ntpserverip'])
     StopCtdbIfAny()
     UpdateHosts()
