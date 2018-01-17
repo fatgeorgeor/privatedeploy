@@ -298,6 +298,7 @@ def mon_preparecephfs():
     run("ceph osd crush rule create-erasure fsecrule fsecprofile") 
     run("ceph osd pool create data 8 8 erasure fsecprofile fsecrule") 
     run("ceph osd pool create metadata 8 8") 
+    run("ceph osd pool set data min_size %d" % (osdnodes-1))
     run("ceph osd pool set data allow_ec_overwrites true") 
     #2. create cephfs
     run("ceph fs new newfs metadata data") 
