@@ -696,6 +696,8 @@ def Prometheus_node():
                 sudo("echo '" + "    - \"" + ip + ":9100\"' >> /etc/prometheus/node_targets.yaml");
 
             sudo("systemctl restart prometheus");
+            #tricky bug maybe, have to restart ceph_exporter
+            sudo("systemctl restart ceph_exporter");
 
 @roles("allnodes")
 def config_snmpd():
