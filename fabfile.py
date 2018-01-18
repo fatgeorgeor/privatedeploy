@@ -697,11 +697,17 @@ def Prometheus_node():
 
             sudo("systemctl restart prometheus");
 
+@roles("allnodes")
+def config_snmpd():
+    put('resoures/snmpd.conf', '/etc/snmp/snmpd.conf', use_sudo=True)
+
+
 def Prometheus():
     print "Configure Prometheus"
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(Prometheus_node)
+            execute(config_snmpd)
 
     print "Configure Prometheus end"
 
