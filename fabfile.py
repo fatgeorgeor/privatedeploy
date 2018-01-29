@@ -297,8 +297,8 @@ def mon_preparecephfs():
     # always use (n-1, 1) to provide more space
     run("ceph osd erasure-code-profile set fsecprofile k=%d m=1 crush-failure-domain=host" % (osdnodes-1))
     run("ceph osd crush rule create-erasure fsecrule fsecprofile") 
-    run("ceph osd pool create data 8 8 erasure fsecprofile fsecrule") 
-    run("ceph osd pool create metadata 8 8") 
+    run("ceph osd pool create data 128 128 erasure fsecprofile fsecrule")
+    run("ceph osd pool create metadata 128 128")
     run("ceph osd pool set data min_size %d" % (osdnodes-1))
     run("ceph osd pool set data allow_ec_overwrites true") 
     #2. create cephfs
