@@ -10,6 +10,7 @@ import json
 import copy
 import pdb
 import re
+import os.path
 from jinja2 import Template
 
 # note:
@@ -700,8 +701,9 @@ def Prometheus_node():
             sudo("systemctl restart ceph_exporter");
 
 @roles("allnodes")
-def config_snmpd():
+def config_snmpd_extendfs():
     put('resoures/snmpd.conf', '/etc/snmp/snmpd.conf', use_sudo=True)
+    put('resoures/extendfs.sh', os.path.join(DEPLOYDIR, 'extendfs.sh'), use_sudo=True)
 
 
 def Prometheus():
@@ -709,7 +711,7 @@ def Prometheus():
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(Prometheus_node)
-            execute(config_snmpd)
+            execute(config_snmpd_extendfs)
 
     print "Configure Prometheus end"
 
