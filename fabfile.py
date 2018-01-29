@@ -123,6 +123,7 @@ def LoadConfig():
     USERDEINEDCONFIG['pd_client_tidb'] = ''
     USERDEINEDCONFIG['pd_name'] = []
     USERDEINEDCONFIG['ips'] = config["osdnodes"]
+    USERDEINEDCONFIG['extendfs'] = config["extendfs"]
 
     counter = 0
     for i in env.roledefs["allnodes"]:
@@ -724,15 +725,16 @@ def Prometheus():
 
 
 @roles("allnodes")
-def do_extendfs():
-    run("sh resoures/extendfs.sh %s"  % USERDEINEDCONFIG['extendfs']);
+def all_extendfs():
+    put("resoures/extendfs.sh", "/opt/extendfs.sh", use_sudo=True)
+    sudo("sh /opt/extendfs.sh %s"  % USERDEINEDCONFIG['extendfs'])
 
 
 def Extendfs():
     print "Configure LVM"
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(do_extendfs)
+            execute(all_extendfs)
 
 
 if __name__ == "__main__":
@@ -749,6 +751,7 @@ if __name__ == "__main__":
     DeployOsds()
     PrepareCephfs()
     StartCtdb() 
-    AddOneExporter('test')
+    #remove this default export
+    #AddOneExporter('test')
     TiDB()
     Prometheus()

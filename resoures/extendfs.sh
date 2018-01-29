@@ -16,14 +16,18 @@ DEVNAME=$1
 if [[ -b ${DEVNAME} ]]
 then
 	pvcreate ${DEVNAME}
-	vgextend systemVG ${DEVNAME}
 
-	lvextend -l+50%FREE /dev/systemVG/LVRoot
-	xfs_growfs /
+	if [[ $? = 0 ]] ;then
+		vgextend systemVG ${DEVNAME}
 
-	lvextend -l+100%FREE /dev/systemVG/var
-	xfs_growfs /var
+		lvextend -l+50%FREE /dev/systemVG/LVRoot
+		xfs_growfs /
+
+		lvextend -l+100%FREE /dev/systemVG/var
+		xfs_growfs /var
+	else
+		echo "${DEVNAME} is already a PV"
+	fi
 else
 	echo "NO SUCH DEVICE: ${DEVNAME}"
 fi
-
