@@ -616,6 +616,12 @@ def SetNtpServer(ip):
 
 # TiDB
 @roles("allnodes")
+def TiDB_install():
+    print "install TiDB"
+    sudo("cd " + USERDEINEDCONFIG['tidb_deploy'] + "; tar zxvf /binaries/tidb-v1.0.6-linux-amd64.tar.gz -C $PWD; mv tidb-v1.0.6-linux-amd64/bin/ .")
+    print "install tidb end"
+
+@roles("allnodes")
 def TiDB_shutdown():
     print "shutdown tidb, tikv, pd"
     file=USERDEINEDCONFIG['tidb_conf']
@@ -681,6 +687,7 @@ def TiDB():
     print "Configure TiDB"
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(TiDB_install)
             execute(TiDB_shutdown)
             execute(TiDB_pd)
             execute(TiDB_tikv)
