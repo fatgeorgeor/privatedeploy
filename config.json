@@ -8,5 +8,5 @@
     "vip":  "192.168.122.176",
     "vip_nic":  "lan0",
     "disks": ["/dev/vdb"],
-    "extendfs": ["YOURDISK"]
+    "extendfs": "YOURDISK"
 }
