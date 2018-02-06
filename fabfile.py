@@ -722,6 +722,16 @@ def TiDB_tidb():
     sudo("sleep 2")
     print "start tidb: " + str(num) + " end"
 
+@roles("allnodes")
+def TiDB_start_post():
+    print "start post"
+    num=run('hostname -s')[-1]
+    num=int(num)
+    sudo("systemctl start nier")
+    sudo("systemctl start niergui")
+    sudo("systemctl start automata")
+    print "start post: " + str(num) + " end"
+
 def TiDB_uninstalls():
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
@@ -774,6 +784,11 @@ def TiDB_pds():
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(TiDB_pd)
     print "Configure TiDB pd end"
+
+def TiDB_start_posts():
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(TiDB_start_post)
 
 # TiDB end
 
@@ -842,4 +857,5 @@ if __name__ == "__main__":
     TiDB_pds()
     TiDB_tikvs()
     TiDB_tidbs()
+    TiDB_start_posts()
     Prometheus()
