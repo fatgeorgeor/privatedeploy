@@ -534,6 +534,17 @@ def ChangeIp():
             execute(startcephservice)
             execute(startctdbservice)
             execute(updateconfigfile, oconfig=oconfig)
+
+    TiDB_shutdown_pres()
+    TiDB_uninstalls()
+    TiDB_shutdown_tidbs()
+    TiDB_shutdown_tikvs()
+    TiDB_shutdown_pds()
+    TiDB_installs()
+    TiDB_pds()
+    TiDB_tikvs()
+    TiDB_tidbs()
+    TiDB_start_posts()
     
 # -------- functions to change monitor ip end------------------------------#
 
