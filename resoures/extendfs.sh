@@ -15,7 +15,14 @@ DEVNAME=$1
 
 if [[ -b ${DEVNAME} ]]
 then
-	pvcreate ${DEVNAME}
+	#size is good enough,
+	VG_SIZE_KB=$(vgdisplay --colon systemVG| awk -F: {'print $12'})
+	if [[ ${VG_SIZE_KB} -gt 100000000 ]] ; then
+		echo "systemVG is ${VG_SIZE_KB}KB, big enough"
+		exit 0
+	fi
+
+	pvcreate -ff ${DEVNAME}
 
 	if [[ $? = 0 ]] ;then
 		vgextend systemVG ${DEVNAME}
