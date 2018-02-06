@@ -623,15 +623,53 @@ def TiDB_install():
     print "install tidb end"
 
 @roles("allnodes")
-def TiDB_shutdown():
-    print "shutdown tidb, tikv, pd"
+def TiDB_uninstall():
+    print "uninstall TiDB"
+    sudo("cd " + USERDEINEDCONFIG['tidb_deploy'] + "; rm -rf bin tidb-v1.0.6-linux-amd64")
+    print "uninstall tidb end"
+
+@roles("allnodes")
+def TiDB_shutdown_pre():
+    print "shutdown pre"
+    num=run('hostname -s')[-1]
+    num=int(num)
+    sudo("systemctl stop nier")
+    sudo("systemctl stop niergui")
+    sudo("systemctl stop automata")
+    print "sshutdown tidb pre: " + str(num) + " end"
+
+@roles("allnodes")
+def TiDB_shutdown_tidb():
+    print "shutdown tidb"
     file=USERDEINEDCONFIG['tidb_conf']
     num=run('hostname -s')[-1]
     num=int(num)
+    sudo("systemctl stop " + "`basename " + USERDEINEDCONFIG['tidb_service'] + "`")
     sudo("killall tidb-server")
+    sudo("cd " + USERDEINEDCONFIG['tidb_deploy'] + "; rm -rf data")
+    print "shutdown tidb: " + str(num) + " end"
+
+@roles("allnodes")
+def TiDB_shutdown_tikv():
+    print "shutdown tikv"
+    file=USERDEINEDCONFIG['tidb_conf']
+    num=run('hostname -s')[-1]
+    num=int(num)
+    sudo("systemctl stop " + "`basename " + USERDEINEDCONFIG['tikv_service'] + "`")
     sudo("killall tikv-server")
+    print "shutdown tidb tikv: " + str(num) + " end"
+
+@roles("allnodes")
+def TiDB_shutdown_pd():
+    print "shutdown pd"
+    file=USERDEINEDCONFIG['tidb_conf']
+    num=run('hostname -s')[-1]
+    num=int(num)
+    sudo("systemctl stop " + "`basename " + USERDEINEDCONFIG['pd_service'] + "`")
     sudo("killall pd-server")
-    print "sshutdown tidb: " + str(num) + " end"
+    print "delete old etcd data"
+    sudo("cd " + USERDEINEDCONFIG['tidb_deploy'] + "; rm -rf data.pd")
+    print "shutdown tidb pd: " + str(num) + " end"
 
 @roles("allnodes")
 def TiDB_pd():
@@ -684,16 +722,58 @@ def TiDB_tidb():
     sudo("sleep 2")
     print "start tidb: " + str(num) + " end"
 
-def TiDB():
-    print "Configure TiDB"
+def TiDB_uninstalls():
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(TiDB_uninstall)
+
+def TiDB_shutdown_pres():
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(TiDB_shutdown_pre)
+
+def TiDB_shutdown_tidbs():
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(TiDB_shutdown_tidb)
+
+def TiDB_shutdown_tikvs():
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(TiDB_shutdown_tikv)
+
+def TiDB_shutdown_pds():
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(TiDB_shutdown_pd)
+
+def TiDB_installs():
+    print "Configure TiDB: install"
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(TiDB_install)
-            execute(TiDB_shutdown)
-            execute(TiDB_pd)
-            execute(TiDB_tikv)
+    print "Configure TiDB install end"
+
+def TiDB_tidbs():
+    print "Configure TiDB: tidb"
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(TiDB_tidb)
-    print "Configure TiDB end"
+    print "Configure TiDB tidb end"
+
+def TiDB_tikvs():
+    print "Configure TiDB: tikv"
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(TiDB_tikv)
+    print "Configure TiDB tikv end"
+
+def TiDB_pds():
+    print "Configure TiDB: pd"
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(TiDB_pd)
+    print "Configure TiDB pd end"
 
 # TiDB end
 
@@ -753,5 +833,12 @@ if __name__ == "__main__":
     StartCtdb() 
     #remove this default export
     #AddOneExporter('test')
-    TiDB()
+    TiDB_shutdown_pres()
+    TiDB_uninstalls()
+    TiDB_shutdown_tidbs()
+    TiDB_shutdown_tikvs()
+    TiDB_shutdown_pds()
+    TiDB_pds()
+    TiDB_tikvs()
+    TiDB_tidbs()
     Prometheus()
