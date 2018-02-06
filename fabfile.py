@@ -838,6 +838,7 @@ if __name__ == "__main__":
     TiDB_shutdown_tidbs()
     TiDB_shutdown_tikvs()
     TiDB_shutdown_pds()
+    TiDB_installs()
     TiDB_pds()
     TiDB_tikvs()
     TiDB_tidbs()
