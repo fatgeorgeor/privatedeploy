@@ -1,12 +1,12 @@
 {
-    "monitors": ["192.168.122.76", "192.168.122.59", "192.168.122.246"],
-    "osdnodes": ["192.168.122.76", "192.168.122.59", "192.168.122.246"],
+    "monitors": ["10.16.0.220", "10.16.0.221", "10.16.0.222"],
+    "osdnodes": ["10.16.0.220", "10.16.0.221", "10.16.0.222", "10.16.0.223"],
     "user":  "root",
     "password":  "Eking1234!",
-    "clusterinfo":  "bj-beishu-cluster",
-    "ntpserverip":  "10.70.140.20",
-    "vip":  "192.168.122.176",
-    "vip_nic":  "lan0",
-    "disks": ["/dev/vdb"],
-    "extendfs": "YOURDISK"
+    "clusterinfo":  "storage-cluster",
+    "ntpserverip":  "10.16.0.230",
+    "vip":  "10.16.0.224",
+    "vip_nic":  "ens802f0",
+    "disks": ["/dev/sda", "/dev/sdb", "/dev/sdc"],
+    "extendfs": "/dev/nvme0n1"
 }
