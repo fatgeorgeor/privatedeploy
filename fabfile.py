@@ -545,6 +545,7 @@ def ChangeIp():
     TiDB_tikvs()
     TiDB_tidbs()
     TiDB_start_posts()
+    Prometheus()
     
 # -------- functions to change monitor ip end------------------------------#
 
