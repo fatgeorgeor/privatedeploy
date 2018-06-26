@@ -1,0 +1,12 @@
+pipeline:
+  build:
+    image: plugins/git
+    commands:
+      - "sh build.sh"
+  github_release:
+    image: plugins/github-release
+    files:
+      - "*.tar.gz"
+    secrets: [github_token]
+    when:
+      event: [tag]
