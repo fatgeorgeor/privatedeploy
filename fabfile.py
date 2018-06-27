@@ -43,13 +43,6 @@ SAMBA_CONFIG_TEMPLATE = '''[{{ mountpoint }}]
         write list = fsuser\n
 '''
 
-CTDB_CONFIG_TEMPLATE = '''#!/bin/sh
-if [[ ! $(findmnt /fs) ]]; then
-    mount -t ceph {{ monitors }}:/ /fs -o name=admin,secret={{ secret }}
-    mkdir -p /fs/ctdb
-    touch /fs/ctdb/.lockfile
-    exit 0
-fi\n'''
 
 def loadConfiguration(file):
     with open(file) as json_file:
@@ -123,7 +116,6 @@ def LoadConfig():
     USERDEINEDCONFIG['pd_client_tidb'] = ''
     USERDEINEDCONFIG['pd_name'] = []
     USERDEINEDCONFIG['ips'] = config["osdnodes"]
-    USERDEINEDCONFIG['extendfs'] = config["extendfs"]
 
     counter = 0
     for i in env.roledefs["allnodes"]:
@@ -294,13 +286,19 @@ def UpdateHosts():
 # note this should be running on a single ceph node, we choose leader monitor here
 def mon_preparecephfs():
     osdnodes = len(env.roledefs['osds'])
+
+    #(fixme) this is just an workaound for a two-node cluster, remove it after test.
+    k = osdnodes - 1
+    if k == 1:
+        k = 2
+
     #1. create ec pool and metadata pool
     # always use (n-1, 1) to provide more space
-    run("ceph osd erasure-code-profile set fsecprofile k=%d m=1 crush-failure-domain=host" % (osdnodes-1))
+    run("ceph osd erasure-code-profile set fsecprofile k=%d m=1 crush-failure-domain=host" % k)
     run("ceph osd crush rule create-erasure fsecrule fsecprofile") 
     run("ceph osd pool create data 128 128 erasure fsecprofile fsecrule")
     run("ceph osd pool create metadata 128 128")
-    run("ceph osd pool set data min_size %d" % (osdnodes-1))
+    run("ceph osd pool set data min_size %d" % k)
     run("ceph osd pool set data allow_ec_overwrites true") 
     #2. create cephfs
     run("ceph fs new newfs metadata data") 
@@ -327,23 +325,12 @@ def all_configctdb():
     sudo("echo %s/24  %s > /etc/ctdb/public_addresses" %(USERDEINEDCONFIG['vip'], USERDEINEDCONFIG['vip_nic'])) 
     for i in env.roledefs['allnodes']:
         append("/etc/ctdb/nodes", i, use_sudo=True)
-        
-@parallel
-@roles("allnodes")
-def all_preparecephfs():
-    key = sudo("ceph auth print-key client.admin") 
-    sudo('rm -rf /fs && mkdir -p /fs')
-    t = Template(CTDB_CONFIG_TEMPLATE)
-    content = t.render(monitors=USERDEINEDCONFIG['monitorhostnames_sep'], secret=key)
-    print content
-    sudo('rm -f /etc/ctdb/mountcephfs.sh && touch /etc/ctdb/mountcephfs.sh')
-    sudo('chmod +x /etc/ctdb/mountcephfs.sh')
-    append('/etc/ctdb/mountcephfs.sh', content, use_sudo=True)
+
     put('resoures/ctdbd.conf', '/etc/ctdb/', use_sudo=True)
     put('resoures/ctdb.service', '/usr/lib/systemd/system/ctdb.service', use_sudo=True)
     put('resoures/nfs', '/etc/sysconfig/nfs', use_sudo=True)
     sudo('systemctl daemon-reload') 
-
+        
 
 @parallel
 @roles("allnodes")
@@ -353,7 +340,6 @@ def all_startctdb():
     
 def StartCtdb():
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-        execute(all_preparecephfs)
         execute(all_configctdb)
         execute(all_startctdb)
 # -------- functions to config ctdb end------------------------------#
@@ -535,16 +521,6 @@ def ChangeIp():
             execute(startctdbservice)
             execute(updateconfigfile, oconfig=oconfig)
 
-    TiDB_shutdown_pres()
-    TiDB_uninstalls()
-    TiDB_shutdown_tidbs()
-    TiDB_shutdown_tikvs()
-    TiDB_shutdown_pds()
-    TiDB_installs()
-    TiDB_pds()
-    TiDB_tikvs()
-    TiDB_tidbs()
-    TiDB_start_posts()
     Prometheus()
     
 # -------- functions to change monitor ip end------------------------------#
@@ -627,182 +603,6 @@ def SetNtpServer(ip):
             execute(setNtp, ip=ip)
 # -------- functions to add new disk as new osd end ------------------------------#
 
-# TiDB
-@roles("allnodes")
-def TiDB_install():
-    print "install TiDB"
-    sudo("cd " + USERDEINEDCONFIG['tidb_deploy'] + "; tar zxvf /binaries/tidb-v1.0.6-linux-amd64.tar.gz -C $PWD; mv tidb-v1.0.6-linux-amd64/bin/ .")
-    print "install tidb end"
-
-@roles("allnodes")
-def TiDB_uninstall():
-    print "uninstall TiDB"
-    sudo("cd " + USERDEINEDCONFIG['tidb_deploy'] + "; rm -rf bin tidb-v1.0.6-linux-amd64")
-    print "uninstall tidb end"
-
-@roles("allnodes")
-def TiDB_shutdown_pre():
-    print "shutdown pre"
-    num=run('hostname -s')[-1]
-    num=int(num)
-    sudo("systemctl stop nier")
-    sudo("systemctl stop niergui")
-    sudo("systemctl stop automata")
-    print "sshutdown tidb pre: " + str(num) + " end"
-
-@roles("allnodes")
-def TiDB_shutdown_tidb():
-    print "shutdown tidb"
-    file=USERDEINEDCONFIG['tidb_conf']
-    num=run('hostname -s')[-1]
-    num=int(num)
-    sudo("systemctl stop " + "`basename " + USERDEINEDCONFIG['tidb_service'] + "`")
-    sudo("killall tidb-server")
-    sudo("cd " + USERDEINEDCONFIG['tidb_deploy'] + "; rm -rf data")
-    print "shutdown tidb: " + str(num) + " end"
-
-@roles("allnodes")
-def TiDB_shutdown_tikv():
-    print "shutdown tikv"
-    file=USERDEINEDCONFIG['tidb_conf']
-    num=run('hostname -s')[-1]
-    num=int(num)
-    sudo("systemctl stop " + "`basename " + USERDEINEDCONFIG['tikv_service'] + "`")
-    sudo("killall tikv-server")
-    print "shutdown tidb tikv: " + str(num) + " end"
-
-@roles("allnodes")
-def TiDB_shutdown_pd():
-    print "shutdown pd"
-    file=USERDEINEDCONFIG['tidb_conf']
-    num=run('hostname -s')[-1]
-    num=int(num)
-    sudo("systemctl stop " + "`basename " + USERDEINEDCONFIG['pd_service'] + "`")
-    sudo("killall pd-server")
-    print "delete old etcd data"
-    sudo("cd " + USERDEINEDCONFIG['tidb_deploy'] + "; rm -rf data.pd")
-    print "shutdown tidb pd: " + str(num) + " end"
-
-@roles("allnodes")
-def TiDB_pd():
-    print "configure tidb placement driver"
-    file=USERDEINEDCONFIG['pd_conf']
-    num=run('hostname -s')[-1]
-    num=int(num)
-    #name = "pdX" 
-    sudo("sed -ibak 's/^name\ *=\ *\"pd.*\"$/name = \"" + USERDEINEDCONFIG['pd_name'][num] + "\"/g' " + file)
-    #client-urls = "http://XXX.XXX.XXX.XXX:2379"
-    sudo("sed -ibak 's/^client-urls\ *=\ *\"http:\/\/.*:2379\"$/client-urls = \"http:\/\/" + USERDEINEDCONFIG['ips'][num] + ":2379\"/g' " + file)
-    #advertise-client-urls = "http://XXX.XXX.XXX.XXX:2379"
-    sudo("sed -ibak 's/^advertise-client-urls\ *=\ *\"http:\/\/.*:2379\"$/advertise-client-urls = \"http:\/\/" + USERDEINEDCONFIG['ips'][num] + ":2379\"/g' " + file)
-    #peer-urls = "http://XXX.XXX.XXX.XXX:2380"
-    sudo("sed -ibak 's/^peer-urls\ *=\ *\"http:\/\/.*:2380\"$/peer-urls = \"http:\/\/" + USERDEINEDCONFIG['ips'][num] + ":2380\"/g' " + file)
-    #advertise-peer-urls = "http://XXX.XXX.XXX.XXX:2380"
-    sudo("sed -ibak 's/^advertise-peer-urls\ *=\ *\"http:\/\/.*:2380\"$/advertise-peer-urls = \"http:\/\/" + USERDEINEDCONFIG['ips'][num] + ":2380\"/g' " + file)
-    #initial-cluster="pd1=http://XXX.XXX.XXX.XXA:2380,pd2=http://XXX.XXX.XXX.XXB:2380,pd3=http://XXX.XXX.XXX.XXC:2380"
-    sudo("sed -ibak 's/^\(initial-cluster\ *=\ *\)\".*\"/\\1\"" + re.escape(repr(USERDEINEDCONFIG['pd_peer'])[1:-1]).replace('\\\\', '\\') + "\"/g' " + file)
-
-    sudo("systemctl restart " + "`basename " + USERDEINEDCONFIG['pd_service'] + "`")
-    sudo("sleep 2")
-    print "start pd: " + str(num) + " end"
-
-@roles("allnodes")
-def TiDB_tikv():
-    print "configure TiKV(key value for TiDB)"
-    file=USERDEINEDCONFIG['tikv_conf']
-    num=run('hostname -s')[-1]
-    num=int(num)
-    #advertise-addr = "XXX.XXX.XXX.XXX:20160"
-    sudo("sed -ibak 's/^advertise-addr\ *=\ *\".*:20160\"$/advertise-addr = \"" + USERDEINEDCONFIG['ips'][num] + ":20160\"/g' " + file)
-    #endpoints = ["XXX.XXX.XXX.XXA:2379","XXX.XXX.XXX.XXB:2379","XXX.XXX.XXX.XXC:2379"]
-    sudo("sed -ibak 's/^endpoints = .*$/endpoints = [" + USERDEINEDCONFIG['pd_client_tikv'][0:-1] + "]/g' " + file)
-
-    sudo("systemctl restart " + "`basename " + USERDEINEDCONFIG['tikv_service'] + "`")
-    sudo("sleep 2")
-    print "start tikv: " + str(num) + " end"
-
-@roles("allnodes")
-def TiDB_tidb():
-    print "configure TiDB itself"
-    file=USERDEINEDCONFIG['tidb_conf']
-    num=run('hostname -s')[-1]
-    num=int(num)
-    #path = "XXX.XXX.XXX.XXA:2379,XXX.XXX.XXX.XXB:2379,XXX.XXX.XXX.XXB:2379"
-    sudo("sed -ibak 's/^path = \".*\"$/path = \"" + USERDEINEDCONFIG['pd_client_tidb'][0:-1] + "\"/g' " + file)
-
-    sudo("systemctl restart " + "`basename " + USERDEINEDCONFIG['tidb_service'] + "`")
-    sudo("sleep 2")
-    print "start tidb: " + str(num) + " end"
-
-@roles("allnodes")
-def TiDB_start_post():
-    print "start post"
-    num=run('hostname -s')[-1]
-    num=int(num)
-    sudo("systemctl start nier")
-    sudo("systemctl start niergui")
-    sudo("systemctl start automata")
-    print "start post: " + str(num) + " end"
-
-def TiDB_uninstalls():
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(TiDB_uninstall)
-
-def TiDB_shutdown_pres():
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(TiDB_shutdown_pre)
-
-def TiDB_shutdown_tidbs():
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(TiDB_shutdown_tidb)
-
-def TiDB_shutdown_tikvs():
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(TiDB_shutdown_tikv)
-
-def TiDB_shutdown_pds():
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(TiDB_shutdown_pd)
-
-def TiDB_installs():
-    print "Configure TiDB: install"
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(TiDB_install)
-    print "Configure TiDB install end"
-
-def TiDB_tidbs():
-    print "Configure TiDB: tidb"
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(TiDB_tidb)
-    print "Configure TiDB tidb end"
-
-def TiDB_tikvs():
-    print "Configure TiDB: tikv"
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(TiDB_tikv)
-    print "Configure TiDB tikv end"
-
-def TiDB_pds():
-    print "Configure TiDB: pd"
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(TiDB_pd)
-    print "Configure TiDB pd end"
-
-def TiDB_start_posts():
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(TiDB_start_post)
-
-# TiDB end
 
 @roles("allnodes")
 def Prometheus_node():
@@ -830,20 +630,6 @@ def Prometheus():
     print "Configure Prometheus end"
 
 
-
-@roles("allnodes")
-def all_extendfs():
-    put("resoures/extendfs.sh", "/opt/extendfs.sh", use_sudo=True)
-    sudo("sh /opt/extendfs.sh %s"  % USERDEINEDCONFIG['extendfs'])
-
-
-def Extendfs():
-    print "Configure LVM"
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(all_extendfs)
-
-
 if __name__ == "__main__":
     Init()
     Check()
@@ -852,7 +638,6 @@ if __name__ == "__main__":
     UpdateHosts()
 
     # only after ceph and smb installed can we add user
-    Extendfs()
     AddUser()
     CreateMonMgrMds()
     DeployOsds()
@@ -860,14 +645,4 @@ if __name__ == "__main__":
     StartCtdb() 
     #remove this default export
     #AddOneExporter('test')
-    TiDB_shutdown_pres()
-    TiDB_uninstalls()
-    TiDB_shutdown_tidbs()
-    TiDB_shutdown_tikvs()
-    TiDB_shutdown_pds()
-    TiDB_installs()
-    TiDB_pds()
-    TiDB_tikvs()
-    TiDB_tidbs()
-    TiDB_start_posts()
     Prometheus()

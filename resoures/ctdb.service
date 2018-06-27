@@ -9,7 +9,6 @@ PIDFile=/run/ctdb/ctdbd.pid
 ExecStart=/usr/sbin/ctdbd_wrapper /run/ctdb/ctdbd.pid start
 ExecStop=/usr/sbin/ctdbd_wrapper /run/ctdb/ctdbd.pid stop
 KillMode=control-group
-ExecStartPre=/etc/ctdb/mountcephfs.sh
 Restart=on-failure
 StartLimitInterval=30min
 StartLimitBurst=30
