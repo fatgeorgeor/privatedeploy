@@ -120,8 +120,8 @@ def LoadConfig():
     counter = 0
     for i in env.roledefs["allnodes"]:
         if i in config["monitors"]:
-            USERDEINEDCONFIG['monitorhostnames'] += "ceph-" + USERDEINEDCONFIG['clusterinfo'] + "-node-" + str(counter) + " "
-            USERDEINEDCONFIG['monitorhostnames_sep'] += "ceph-" + USERDEINEDCONFIG['clusterinfo'] + "-node-" + str(counter) + ","
+            USERDEINEDCONFIG['monitorhostnames'] += "oceanstore-" + USERDEINEDCONFIG['clusterinfo'] + "-node-" + str(counter) + " "
+            USERDEINEDCONFIG['monitorhostnames_sep'] += "oceanstore-" + USERDEINEDCONFIG['clusterinfo'] + "-node-" + str(counter) + ","
 
         counter = counter + 1
     USERDEINEDCONFIG['monitorhostnames_sep'] = USERDEINEDCONFIG['monitorhostnames_sep'].strip(',')
@@ -270,7 +270,7 @@ def all_updatehosts():
 def UpdateHosts():
     counter = 0
     for i in env.roledefs["allnodes"]:
-        hostnametoset = "ceph-" + USERDEINEDCONFIG['clusterinfo'] + "-node-" + str(counter)
+        hostnametoset = "oceanstore-" + USERDEINEDCONFIG['clusterinfo'] + "-node-" + str(counter)
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             # we must specify host to localhost to run this command locally
             execute(local_appendhosts, host="127.0.0.1", hostip=i, hostname=hostnametoset) 
