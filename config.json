@@ -6,6 +6,5 @@
     "clusterinfo":  "storage-cluster",
     "ntpserverip":  "10.70.140.20",
     "vip":  "10.70.242.224",
-    "vip_nic":  "ens802f0",
     "disks": ["/dev/sdd", "/dev/sdc"]
 }

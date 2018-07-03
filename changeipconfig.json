@@ -6,6 +6,5 @@
     "clusterinfo": "storage-cluster",
     "user":  "root",
     "password":  "Eking1234!",
-    "newvip":  "10.16.0.244",
-    "newvip_nic":  "ens802f0"
+    "newvip":  "10.16.0.244"
 }

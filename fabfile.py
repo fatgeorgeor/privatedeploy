@@ -107,7 +107,6 @@ def LoadConfig():
     USERDEINEDCONFIG['disks'] = config["disks"]
     USERDEINEDCONFIG['vip'] = config["vip"]
     USERDEINEDCONFIG['ntpserverip'] = config["ntpserverip"]
-    USERDEINEDCONFIG['vip_nic'] = config["vip_nic"]
     USERDEINEDCONFIG['monitorhostnames'] = ''
     USERDEINEDCONFIG['monitorhostnames_sep'] = ''
     USERDEINEDCONFIG['allnodehostnames'] = ''
@@ -315,14 +314,14 @@ def PrepareCephfs():
 # -------- functions to config ctdb begin ------------------------------#
 @parallel
 @roles("allnodes")
-def all_configctdb():
+def all_configctdb_basic():
     sudo('systemctl disable smb')
     sudo('systemctl disable nfs')
     put('resoures/smb.conf', '/etc/samba/smb.conf', use_sudo=True)
+    put('resoures/getnic.sh', '/tmp/getnic.sh', use_sudo=True)
     sudo('echo -n > /etc/exports')
-    sudo("sudo rm  /etc/ctdb/public_addresses /etc/ctdb/nodes -f") 
+    sudo("sudo rm  /etc/ctdb/nodes -f") 
     sudo("echo %s ctdb  >> /etc/hosts" % USERDEINEDCONFIG['vip'])
-    sudo("echo %s/24  %s > /etc/ctdb/public_addresses" %(USERDEINEDCONFIG['vip'], USERDEINEDCONFIG['vip_nic'])) 
     for i in env.roledefs['allnodes']:
         append("/etc/ctdb/nodes", i, use_sudo=True)
 
@@ -331,6 +330,15 @@ def all_configctdb():
     put('resoures/nfs', '/etc/sysconfig/nfs', use_sudo=True)
     sudo('systemctl daemon-reload') 
         
+def all_configctdb_advanced():
+    sudo("sudo rm  /etc/ctdb/public_addresses -f")
+    nic=sudo("sh /tmp/getnic.sh " + env.host)
+    sudo("echo %s/24  %s > /etc/ctdb/public_addresses" %(USERDEINEDCONFIG['vip'], nic))
+
+def all_configctdb_advanced_changeip():
+    sudo("sudo rm  /etc/ctdb/public_addresses -f")
+    nic=sudo("sh /tmp/getnic.sh " + env.host)
+    sudo("echo %s/24  %s > /etc/ctdb/public_addresses" %(USERDEINEDCONFIG['newvip'], nic))
 
 @parallel
 @roles("allnodes")
@@ -340,7 +348,9 @@ def all_startctdb():
     
 def StartCtdb():
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-        execute(all_configctdb)
+        execute(all_configctdb_basic)
+        for i in env.roledefs['allnodes']:
+            execute(all_configctdb_advanced, host=i)
         execute(all_startctdb)
 # -------- functions to config ctdb end------------------------------#
 
@@ -387,7 +397,6 @@ def loadNewConfig():
     user = USERDEINEDCONFIG['user'] = config["user"]
     password = USERDEINEDCONFIG['password'] = config["password"]
     USERDEINEDCONFIG['newvip'] = config["newvip"]
-    USERDEINEDCONFIG['newvip_nic'] = config["newvip_nic"]
 
     env.roledefs['newmonitors'] = config["newmonitors"]
     env.roledefs['newosdnodes'] = config["newosdnodes"]
@@ -409,7 +418,6 @@ def loadNewConfig():
         exit(-1)
 
     USERDEINEDCONFIG['vip'] = config["newvip"]
-    USERDEINEDCONFIG['vip_nic'] = config["newvip_nic"]
 
 
 
@@ -461,14 +469,12 @@ def startcephservice():
 @roles('allnodes')
 def modifyhostsandctdbconfigs():
     sudo('rm /etc/ctdb/nodes -f')
-    sudo('rm /etc/ctdb/public_addresses -f')
     for ip, hostname in iphostnamedict.items():
         sudo('sed -i "/%s/d" /etc/hosts' % hostname)
         append('/etc/hosts', ip + " " + hostname, use_sudo=True)
         append('/etc/ctdb/nodes', ip, use_sudo=True)
     sudo('sed -i "/ctdb/d" /etc/hosts')
     append('/etc/hosts', USERDEINEDCONFIG['newvip'] + " ctdb", use_sudo=True)
-    sudo("echo %s/24  %s > /etc/ctdb/public_addresses" %(USERDEINEDCONFIG['newvip'], USERDEINEDCONFIG['newvip_nic'])) 
 
 @parallel
 @roles('newmonitors')
@@ -492,7 +498,6 @@ def updateconfigfile(oconfig):
     oconfig['monitors'] = env.roledefs['newmonitors']
     oconfig['osdnodes'] = env.roledefs['newosdnodes']
     oconfig['vip'] = USERDEINEDCONFIG['newvip']
-    oconfig['vip_nic'] = USERDEINEDCONFIG['newvip_nic']
 
     f=open('config.json.new', 'w')
     json.dump(oconfig, f, indent=2)
@@ -516,6 +521,8 @@ def ChangeIp():
             for i in env.roledefs['allnodes']:
                 execute(whoami, host=i)
             execute(modifyhostsandctdbconfigs)
+            for i in env.roledefs['allnodes']:
+                execute(all_configctdb_advanced_changeip, host=i)
             execute(changemonitorconfig)
             execute(startcephservice)
             execute(startctdbservice)
