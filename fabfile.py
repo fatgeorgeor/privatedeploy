@@ -12,6 +12,7 @@ import pdb
 import re
 import os.path
 from jinja2 import Template
+import cephfs as libcephfs
 
 # note:
 # 1. All functions start with Capital words are called in main function.
@@ -373,9 +374,6 @@ def AddUser():
 @parallel
 @roles("allnodes")
 def addOneExporter(dirname):
-    sudo('mkdir -p /fs/%s /%s' % (dirname, dirname))
-    sudo('chown -R fsuser:fsuser /fs/%s' % dirname)
-    sudo('chmod -R 0777 /fs/%s' % dirname)
     append('/etc/exports', '/fs/%s *(rw,sync,no_subtree_check,all_squash,anonuid=10099,anongid=10099)' % dirname, use_sudo=True)
     sudo('exportfs -a')
     t = Template(SAMBA_CONFIG_TEMPLATE)
@@ -385,7 +383,19 @@ def addOneExporter(dirname):
 
 def AddOneExporter(dirname):
     LoadConfig()
-    with settings(warn_only=True):
+    #create dir using cephfs API
+    try:
+        cephfs = libcephfs.LibCephFS(conffile='')
+        cephfs.mount()
+        try:
+            cephfs.stat(dirname)
+        except libcephfs.ObjectNotFound:
+            cephfs.mkdir(dirname, 0o777)
+        cephfs.shutdown()
+     except Exception as e:
+        print(e)
+        return
+     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(addOneExporter, dirname=dirname)
 # -------- functions to add nfs and smb add one exporter end------------------------------#
