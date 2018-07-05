@@ -442,6 +442,18 @@ def whoami():
         
 # we don't stop/start services on parallel to avoid problems on parallel stop of ctdb service.
 @roles('allnodes')
+def stopotherservices():
+    sudo("systemctl stop nier")
+    sudo("systemctl stop niergui")
+    sudo("systemctl stop automata")
+
+@roles('allnodes')
+def startotherservices():
+    sudo("systemctl start nier")
+    sudo("systemctl start niergui")
+    sudo("systemctl start automata")
+    
+@roles('allnodes')
 def stopctdbservice():
     sudo("systemctl stop ctdb")
     sudo("umount /fs -l")
@@ -550,6 +562,18 @@ def StopCtdbIfAny():
 
 
 @roles('allnodes')
+def StopOtherServicesIfAny():
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(stopotherservices)
+
+@roles('allnodes')
+def StartOtherServices():
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(startotherservices)
+
+@roles('allnodes')
 def reboot():
     sudo("sudo reboot")
 
@@ -651,6 +675,7 @@ if __name__ == "__main__":
     Init()
     Check()
     SetNtpServer(ip=USERDEINEDCONFIG['ntpserverip'])
+    StopOtherServicesIfAny()
     StopCtdbIfAny()
     UpdateHosts()
 
@@ -663,3 +688,4 @@ if __name__ == "__main__":
     #remove this default export
     #AddOneExporter('test')
     Prometheus()
+    StartOtherServices()
