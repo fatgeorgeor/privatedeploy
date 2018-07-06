@@ -392,10 +392,10 @@ def AddOneExporter(dirname):
         except libcephfs.ObjectNotFound:
             cephfs.mkdir(dirname, 0o777)
         cephfs.shutdown()
-     except Exception as e:
+    except Exception as e:
         print(e)
         return
-     with settings(warn_only=True):
+    with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(addOneExporter, dirname=dirname)
 # -------- functions to add nfs and smb add one exporter end------------------------------#
@@ -452,7 +452,7 @@ def startotherservices():
     sudo("systemctl start nier")
     sudo("systemctl start niergui")
     sudo("systemctl start automata")
-    
+
 @roles('allnodes')
 def stopctdbservice():
     sudo("systemctl stop ctdb")
