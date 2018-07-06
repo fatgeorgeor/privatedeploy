@@ -14,7 +14,6 @@ There is a ```config.json``` file, all parameter must be provided.
 * clusterinfo: information of this cluster
 * ntpserverip: ip of the ntp server
 * vip: the vip to export smb/nfs
-* vip_nic: the nic name where ctdb can bind
 * disks: a list of disks to install ceph osds
 
 ## How to run
@@ -32,7 +31,6 @@ There is a ```changeipconfig.json``` file, all parameter must be provided.
 * user: a system user used to deploy the system
 * password: the password of user
 * newvip: the vip to export smb/nfs(you may change the nic, so we provide this option)
-* newvip_nic: the nic name where ctdb can bind
 After ```changeipconfig.json``` configed, You can simply run with:
 ```
 fab ChangeIp
