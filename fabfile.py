@@ -235,7 +235,7 @@ def all_cleancephdatawithmercy():
 def local_createmonitorsandmgrs(mons):
     local("ceph-deploy --overwrite-conf new " + mons)
     local("ceph-deploy --overwrite-conf mon create " + mons)
-    time.sleep(10)
+    time.sleep(30)
     local("ceph-deploy gatherkeys " +  mons)
     local("ceph-deploy --overwrite-conf mgr create " + mons)
     local("ceph-deploy --overwrite-conf mds create " + mons)
