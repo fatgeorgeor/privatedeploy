@@ -633,6 +633,7 @@ def setNtp(ip):
     sudo('sed -i "/ExecStartPre/aExecStopPost=/usr/sbin/ntpdate ntpserver" /usr/lib/systemd/system/ntpd.service')
     sudo('systemctl daemon-reload')
     sudo('systemctl restart ntpd')
+    sudo('ntpdate ntpserver')
     
 
 def SetNtpServer(ip):
