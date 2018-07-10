@@ -629,11 +629,12 @@ def setNtp(ip):
     append('/etc/ntp.conf', 'server ntpserver iburst', use_sudo=True)
     append('/etc/hosts', '%s ntpserver' % ip, use_sudo=True)
     append('/etc/sysconfig/ntpd', 'SYNC_HWCLOCK=yes', use_sudo=True)
+    append('/etc/sysconfig/ntpd', 'NTPDATE_OPTIONS=""', use_sudo=True)
+    append('/etc/sysconfig/ntpd', 'OPTIONS="-g"', use_sudo=True)
     sudo('sed -i "/ExecStart/aExecStartPre=/usr/sbin/ntpdate ntpserver" /usr/lib/systemd/system/ntpd.service')
     sudo('sed -i "/ExecStartPre/aExecStopPost=/usr/sbin/ntpdate ntpserver" /usr/lib/systemd/system/ntpd.service')
     sudo('systemctl daemon-reload')
     sudo('systemctl restart ntpd')
-    sudo('ntpdate ntpserver')
     
 
 def SetNtpServer(ip):
