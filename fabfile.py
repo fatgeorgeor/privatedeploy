@@ -58,7 +58,6 @@ def all_systemconfig():
     sudo('systemctl disable firewalld')
     sudo('setenforce 0')
     sudo("sed -i -e s/SELINUX=enforcing/SELINUX=disabled/g /etc/selinux/config")
-    sudo('sed -i "/ctdb/d" /etc/hosts')
 
 @parallel
 @roles('osds')
@@ -310,49 +309,6 @@ def PrepareCephfs():
     time.sleep(5)
 # -------- functions to prepare cephfs begin ------------------------------#
 
-# -------- functions to config ctdb begin ------------------------------#
-@parallel
-@roles("allnodes")
-def all_configctdb_basic():
-    sudo('systemctl disable smb')
-    sudo('systemctl disable nfs')
-    put('resoures/smb.conf', '/etc/samba/smb.conf', use_sudo=True)
-    put('resoures/getnic.sh', '/tmp/getnic.sh', use_sudo=True)
-    sudo('echo -n > /etc/exports')
-    sudo("sudo rm  /etc/ctdb/nodes -f") 
-    sudo("echo %s ctdb  >> /etc/hosts" % USERDEINEDCONFIG['vip'])
-    for i in env.roledefs['allnodes']:
-        append("/etc/ctdb/nodes", i, use_sudo=True)
-
-    put('resoures/ctdbd.conf', '/etc/ctdb/', use_sudo=True)
-    put('resoures/ctdb.service', '/usr/lib/systemd/system/ctdb.service', use_sudo=True)
-    put('resoures/nfs', '/etc/sysconfig/nfs', use_sudo=True)
-    sudo('systemctl daemon-reload') 
-        
-def all_configctdb_advanced():
-    sudo("sudo rm  /etc/ctdb/public_addresses -f")
-    nic=sudo("sh /tmp/getnic.sh " + env.host)
-    sudo("echo %s/24  %s > /etc/ctdb/public_addresses" %(USERDEINEDCONFIG['vip'], nic))
-
-def all_configctdb_advanced_changeip():
-    sudo("sudo rm  /etc/ctdb/public_addresses -f")
-    nic=sudo("sh /tmp/getnic.sh " + env.host)
-    sudo("echo %s/24  %s > /etc/ctdb/public_addresses" %(USERDEINEDCONFIG['newvip'], nic))
-
-@parallel
-@roles("allnodes")
-def all_startctdb():
-    sudo('systemctl enable ctdb')
-    sudo('systemctl restart ctdb')
-    
-def StartCtdb():
-    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-        execute(all_configctdb_basic)
-        for i in env.roledefs['allnodes']:
-            execute(all_configctdb_advanced, host=i)
-        execute(all_startctdb)
-# -------- functions to config ctdb end------------------------------#
-
 # -------- functions to add nfs and smb user start ------------------------------#
 @parallel
 @roles("allnodes")
@@ -368,7 +324,6 @@ def AddUser():
 # -------- functions to add nfs and smb user end ------------------------------#
 
 # -------- functions to add nfs and smb add one exporter begin------------------------------#
-# note nfs and smb are all managed by ctdb.
 @parallel
 @roles("allnodes")
 def addOneExporter(dirname):
@@ -438,7 +393,6 @@ def whoami():
     if env.host in env.roledefs['newmonitors']:
         moniphostnamedict[env.host] = hostname
         
-# we don't stop/start services on parallel to avoid problems on parallel stop of ctdb service.
 @roles('allnodes')
 def stopotherservices():
     sudo("systemctl stop nier")
@@ -450,15 +404,6 @@ def startotherservices():
     sudo("systemctl start nier")
     sudo("systemctl start niergui")
     sudo("systemctl start automata")
-
-@roles('allnodes')
-def stopctdbservice():
-    sudo("systemctl stop ctdb")
-    sudo("umount /fs -l")
-
-@roles('allnodes')
-def startctdbservice():
-    sudo("systemctl start ctdb")
 
 @parallel
 @roles('allnodes')
@@ -487,14 +432,10 @@ def startcephservice():
 
 @parallel
 @roles('allnodes')
-def modifyhostsandctdbconfigs():
-    sudo('rm /etc/ctdb/nodes -f')
+def modifyhosts():
     for ip, hostname in iphostnamedict.items():
         sudo('sed -i "/%s/d" /etc/hosts' % hostname)
         append('/etc/hosts', ip + " " + hostname, use_sudo=True)
-        append('/etc/ctdb/nodes', ip, use_sudo=True)
-    sudo('sed -i "/ctdb/d" /etc/hosts')
-    append('/etc/hosts', USERDEINEDCONFIG['newvip'] + " ctdb", use_sudo=True)
 
 @parallel
 @roles('newmonitors')
@@ -536,29 +477,19 @@ def ChangeIp():
         print("must have same size of monitors and osds")
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(stopctdbservice)
             execute(stopcephservice)
             for i in env.roledefs['allnodes']:
                 execute(whoami, host=i)
-            execute(modifyhostsandctdbconfigs)
+            execute(modifyhosts)
             for i in env.roledefs['allnodes']:
-                execute(all_configctdb_advanced_changeip, host=i)
+                execute(config_keepalived_interface, host=i)
             execute(changemonitorconfig)
             execute(startcephservice)
-            execute(startctdbservice)
             execute(updateconfigfile, oconfig=oconfig)
 
     Prometheus()
     
 # -------- functions to change monitor ip end------------------------------#
-
-@roles('allnodes')
-def StopCtdbIfAny():
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(stopctdbservice)
-
-
 @roles('allnodes')
 def StopOtherServicesIfAny():
     with settings(warn_only=True):
@@ -581,17 +512,6 @@ def Reboot():
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(reboot)
 
-
-@parallel
-@roles('allnodes')
-def uptime():
-    sudo("systemctl stop ctdb")
-
-def StopAllCtdb():
-    LoadConfig()
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(uptime)
 
 @parallel
 @roles('allnodes')
@@ -670,13 +590,56 @@ def Prometheus():
 
     print "Configure Prometheus end"
 
+@parallel
+@roles("allnodes")
+def stop_keepalived():
+    sudo('systemctl stop keepalived')
+
+@parallel
+@roles("allnodes")
+def start_keepalived():
+    sudo('systemctl restart keepalived')
+
+@roles("allnodes")
+def config_keepalivedbasic_smbnfs():
+    put('resoures/keepalived.conf', '/etc/keepalived/keepalived.conf', use_sudo=True)
+    sudo('systemctl enable keepalived')
+    sudo('systemctl enable smb')
+    sudo('systemctl enable nfs')
+    put('resoures/smb.conf', '/etc/samba/smb.conf', use_sudo=True)
+    put('resoures/getnic.sh', '/tmp/getnic.sh', use_sudo=True)
+    sudo('echo -n > /etc/exports')
+
+@parallel
+@roles("allnodes")
+def config_keepalived_interface():
+    nic=sudo("sh /tmp/getnic.sh " + env.host)
+    sudo("augtool set /files/etc/keepalived/keepalived.conf/vrrp_instance/interface %s " % (nic))
+    sudo("augtool set /files/etc/keepalived/keepalived.conf/vrrp_instance/virtual_ipaddress/ipaddr %s " % (USERDEINEDCONFIG["vip"]))
+    hostname=sudo("hostname -s")
+
+    #all servers are BACKUP, only difference is the priority
+    sudo("augtool set /files/etc/keepalived/keepalived.conf/vrrp_instance/priority %d" % (100-int(hostname[-1])))
+
+def StopKeepalivedIfAny():
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(stop_keepalived)
+
+def StartKeepalived():
+    print "Configure Keepalived"
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(config_keepalivedbasic_smbnfs)
+            execute(config_keepalived_interface)
+            execute(start_keepalived)
 
 if __name__ == "__main__":
     Init()
     Check()
     SetNtpServer(ip=USERDEINEDCONFIG['ntpserverip'])
     StopOtherServicesIfAny()
-    StopCtdbIfAny()
+    StopKeepalivedIfAny()
     UpdateHosts()
 
     # only after ceph and smb installed can we add user
@@ -684,7 +647,7 @@ if __name__ == "__main__":
     CreateMonMgrMds()
     DeployOsds()
     PrepareCephfs()
-    StartCtdb() 
+    StartKeepalived() 
     #remove this default export
     #AddOneExporter('test')
     Prometheus()
