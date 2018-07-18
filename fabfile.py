@@ -618,7 +618,10 @@ def config_keepalived_interface():
     sudo("augtool set /files/etc/keepalived/keepalived.conf/vrrp_instance/virtual_ipaddress/ipaddr %s " % (USERDEINEDCONFIG["vip"]))
     hostname=sudo("hostname -s")
 
-    #all servers are BACKUP, only difference is the priority
+    #first server set to MASTER
+    if int(hostname[-1]) == 0:
+        sudo("augtool set /files/etc/keepalived/keepalived.conf/vrrp_instance/state MASTER") 
+
     sudo("augtool set /files/etc/keepalived/keepalived.conf/vrrp_instance/priority %d" % (100-int(hostname[-1])))
 
 def StopKeepalivedIfAny():
