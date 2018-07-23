@@ -164,6 +164,7 @@ def osd_deployosds():
             for host,disks in USERDEINEDCONFIG['disks'].items():
                 if env.host == host:
                     for disk in disks:
+                        run('dd if=/dev/zero of=%s bs=128M count=1' % disk)
                         run('ceph-deploy --overwrite-conf osd create --zap-disk %s:%s' % (host, disk))
                     break
 @parallel
