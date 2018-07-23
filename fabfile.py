@@ -154,36 +154,18 @@ def Init():
             execute(all_systemconfig)
             execute(osd_updatecephdisk)
 
-@roles('allnodes')
-def check_disk_available():
-    for disk in USERDEINEDCONFIG['disks']:
-        result = run("lsblk " + disk);
-        if result.return_code == 0: 
-            pass
-        elif result.return_code == 1: 
-            print env.host_string + " disk: " + disk + " does not exist. exit" 
-            raise SystemExit()
-        else: #print error to user
-            print result
-            raise SystemExit()
-
-def Check():
-    with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(check_disk_available)
-
 # -------- functions deploy osds begin------------------------------#
 @parallel
 @roles('osds')
 def osd_deployosds():
-    disks = ""
-    for i in USERDEINEDCONFIG['disks']:
-        disks += env.host + ":" + i + " "
-        
     with cd(DEPLOYDIR):
-            with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-                run('ceph-deploy --overwrite-conf osd create --zap-disk %s' % disks)
-
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            print(USERDEINEDCONFIG['disks'])
+            for host,disks in USERDEINEDCONFIG['disks'].items():
+                if env.host == host:
+                    for disk in disks:
+                        run('ceph-deploy --overwrite-conf osd create --zap-disk %s:%s' % (host, disk))
+                    break
 @parallel
 @roles('osds')
 def osds_makedeploydir():
@@ -501,6 +483,7 @@ def StartOtherServices():
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(startotherservices)
+    time.sleep(5)
 
 @roles('allnodes')
 def reboot():
@@ -639,7 +622,6 @@ def StartKeepalived():
 
 if __name__ == "__main__":
     Init()
-    Check()
     SetNtpServer(ip=USERDEINEDCONFIG['ntpserverip'])
     StopOtherServicesIfAny()
     StopKeepalivedIfAny()

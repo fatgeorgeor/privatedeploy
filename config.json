@@ -1,10 +1,22 @@
 {
-    "monitors": ["10.70.242.204"],
-    "osdnodes": ["10.70.242.204", "10.70.242.205"],
-    "user":  "root",
-    "password":  "Eking1234!",
-    "clusterinfo":  "storage-cluster",
-    "ntpserverip":  "10.70.140.20",
-    "vip":  "10.70.242.224",
-    "disks": ["/dev/sdd", "/dev/sdc"]
+    "monitors": [
+        "10.70.249.6",
+        "10.70.249.60",
+        "10.70.249.34"
+    ],
+    "osdnodes": [
+        "10.70.249.6",
+        "10.70.249.60",
+        "10.70.249.34"
+    ],
+    "user": "root",
+    "password": "Eking1234!",
+    "clusterinfo": "storage-stor",
+    "ntpserverip": "10.70.140.20",
+    "vip": "10.70.249.51",
+    "disks": {
+        "10.70.249.6":["/dev/vde","/dev/vdb", "/dev/vdf" ],
+        "10.70.249.60":["/dev/vdd","/dev/vdc", "/dev/vdb"],
+        "10.70.249.34":["/dev/vdd","/dev/vdc", "/dev/vdb"]
+    }
 }
