@@ -380,12 +380,16 @@ def stopotherservices():
     sudo("systemctl stop nier")
     sudo("systemctl stop niergui")
     sudo("systemctl stop automata")
+    sudo("systemctl stop smb")
+    sudo("systemctl stop nfs")
 
 @roles('allnodes')
 def startotherservices():
     sudo("systemctl start nier")
     sudo("systemctl start niergui")
     sudo("systemctl start automata")
+    sudo('systemctl start smb')
+    sudo('systemctl start nfs')
 
 @parallel
 @roles('allnodes')
