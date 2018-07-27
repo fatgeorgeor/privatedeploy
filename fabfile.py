@@ -335,6 +335,23 @@ def AddOneExporter(dirname):
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(addOneExporter, dirname=dirname)
+
+@parallel
+@roles("allnodes")
+def removeOneExporter(dirname):
+    exportstr = '\/fs\/%s ' % dirname
+    sudo('sed -i "%s/d" /etc/exports' % exportstr)
+    sudo('exportfs -a')
+    smbstr = "\[%s\]" % dirname
+    sudo('sed -i "/%s/,+9d" /etc/samba/smb.conf' % smbstr)
+    sudo('systemctl reload smb')
+
+
+def RemoveOneExporter(dirname):
+    LoadConfig()
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(removeOneExporter, dirname=dirname)
 # -------- functions to add nfs and smb add one exporter end------------------------------#
 
 
