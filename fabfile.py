@@ -76,8 +76,8 @@ def all_systemconfig():
 @parallel
 @roles('osds')
 def osd_updatecephdisk():
-    put('resoures/main.py', '/usr/lib/python2.7/site-packages/ceph_disk/main.py', use_sudo=True)
-    put('resoures/99-ceph-osd-remove.rules', '/usr/lib/udev/rules.d/', use_sudo=True)
+    put('resources/main.py', '/usr/lib/python2.7/site-packages/ceph_disk/main.py', use_sudo=True)
+    put('resources/99-ceph-osd-remove.rules', '/usr/lib/udev/rules.d/', use_sudo=True)
 
 @parallel
 @roles('allnodes')
@@ -594,8 +594,8 @@ def SetNtpServer(ip):
 
 @roles("allnodes")
 def Prometheus_node():
-            put('resoures/prometheus.yaml', '/etc/prometheus/', use_sudo=True)
-            put('resoures/node_targets.yaml', '/etc/prometheus/', use_sudo=True)
+            put('resources/prometheus.yaml', '/etc/prometheus/', use_sudo=True)
+            put('resources/node_targets.yaml', '/etc/prometheus/', use_sudo=True)
             for ip in USERDEINEDCONFIG['ips']: 
                 sudo("echo '" + "    - \"" + ip + ":9100\"' >> /etc/prometheus/node_targets.yaml");
 
@@ -605,7 +605,7 @@ def Prometheus_node():
 
 @roles("allnodes")
 def config_snmpd():
-    put('resoures/snmpd.conf', '/etc/snmp/snmpd.conf', use_sudo=True)
+    put('resources/snmpd.conf', '/etc/snmp/snmpd.conf', use_sudo=True)
 
 
 def Prometheus():
@@ -629,14 +629,14 @@ def start_keepalived():
 
 @roles("allnodes")
 def config_keepalivedbasic_smbnfs():
-    put('resoures/keepalived.conf', '/etc/keepalived/keepalived.conf', use_sudo=True)
+    put('resources/keepalived.conf', '/etc/keepalived/keepalived.conf', use_sudo=True)
     sudo('systemctl enable keepalived')
     sudo('systemctl enable smb')
     sudo('systemctl enable nfs-ganesha')
-    put('resoures/smb.conf', '/etc/samba/smb.conf', use_sudo=True)
-    put('resoures/ganesha.conf', '/etc/ganesha/ganesha.conf', use_sudo=True)
-    put('resoures/getid.py', '/etc/ganesha/getid.py')
-    put('resoures/getnic.sh', '/tmp/getnic.sh', use_sudo=True)
+    put('resources/smb.conf', '/etc/samba/smb.conf', use_sudo=True)
+    put('resources/ganesha.conf', '/etc/ganesha/ganesha.conf', use_sudo=True)
+    put('resources/getid.py', '/etc/ganesha/getid.py')
+    put('resources/getnic.sh', '/tmp/getnic.sh', use_sudo=True)
     sudo('echo -n > /etc/exports')
 
 @parallel
