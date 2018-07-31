@@ -8,6 +8,8 @@ pipeline:
     files:
       - "*.tar.gz"
     secrets: [github_token]
+    checksum:
+      - md5
     when:
       event: [tag]
   pushbear:
