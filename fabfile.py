@@ -78,8 +78,6 @@ def all_systemconfig():
 def osd_updatecephdisk():
     put('resoures/main.py', '/usr/lib/python2.7/site-packages/ceph_disk/main.py', use_sudo=True)
     put('resoures/99-ceph-osd-remove.rules', '/usr/lib/udev/rules.d/', use_sudo=True)
-    put('resoures/disk.py', '/opt/cephdeploy/disk.py', use_sudo=True)
-    sudo('chmod 777 /opt/cephdeploy/disk.py')
 
 @parallel
 @roles('allnodes')
