@@ -17,6 +17,7 @@ pipeline:
     url: XXXX
     secrets: [sendkey]
     when:
+      event: [tag push]
       success: false
       failure: false
       change: true
