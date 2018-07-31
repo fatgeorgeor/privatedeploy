@@ -10,3 +10,11 @@ pipeline:
     secrets: [github_token]
     when:
       event: [tag]
+  pushbear:
+    image: thesues/drone-pushbear
+    url: XXXX
+    secrets: [sendkey]
+    when:
+      success: false
+      failure: false
+      change: true
