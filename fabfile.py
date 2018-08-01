@@ -43,7 +43,7 @@ SAMBA_CONFIG_TEMPLATE = '''[{{ mountpoint }}]
         write list = fsuser\n
 '''
 GANESHA_CONFIG_TEMPLATE = """
-# this is for nfs {{ path }} only, never remove it.
+# this is for nfs {{ path }} {{ exportid }} only, never remove it.
 EXPORT
 {
 	Export_ID = {{ exportid }};
@@ -70,6 +70,7 @@ def read_key_file(key_file):
 def all_systemconfig():
     sudo('systemctl stop firewalld')
     sudo('systemctl disable firewalld')
+    sudo('systemctl disable nfs')
     sudo('setenforce 0')
     sudo("sed -i -e s/SELINUX=enforcing/SELINUX=disabled/g /etc/selinux/config")
 
@@ -78,6 +79,7 @@ def all_systemconfig():
 def osd_updatecephdisk():
     put('resources/main.py', '/usr/lib/python2.7/site-packages/ceph_disk/main.py', use_sudo=True)
     put('resources/99-ceph-osd-remove.rules', '/usr/lib/udev/rules.d/', use_sudo=True)
+    put('resources/getidbydir.py', '/etc/ganesha/getidbydir.py', use_sudo=True)
 
 @parallel
 @roles('allnodes')
@@ -324,7 +326,7 @@ def AddUser():
 @parallel
 @roles("allnodes")
 def addOneExporter(dirname):
-    append('/etc/exports', '/fs/%s *(rw,sync,no_subtree_check,all_squash,anonuid=10099,anongid=10099)' % dirname, use_sudo=True)
+    append('/etc/exports', '/%s *(rw,sync,no_subtree_check,all_squash,anonuid=10099,anongid=10099)' % dirname, use_sudo=True)
     t = Template(SAMBA_CONFIG_TEMPLATE)
     content = t.render(mountpoint=dirname)
     sudo('echo "%s" >> /etc/samba/smb.conf' % content)
@@ -357,14 +359,17 @@ def AddOneExporter(dirname):
 @parallel
 @roles("allnodes")
 def removeOneExporter(dirname):
-    exportstr = '\/fs\/%s ' % dirname
+    exportstr = '\\/%s ' % dirname
     sudo('sed -i "%s/d" /etc/exports' % exportstr)
     smbstr = "\[%s\]" % dirname
     sudo('sed -i "/%s/,+9d" /etc/samba/smb.conf' % smbstr)
     sudo('systemctl reload smb')
     nfsstr = "# this is for nfs %s only, never remove it." % dirname
     sudo('sed -i "/%s/,+12d" /etc/ganesha/ganesha.conf' % nfsstr)
-    sudo('systemctl reload nfs-ganesha')
+
+    eid = sudo('python /etc/ganesha/getidbydir.py %s' % dirname)
+    nfsstr = "# this is for nfs %s %s only, never remove it." % (dirname, eid)
+    sudo('dbus-send --print-reply --system --dest=org.ganesha.nfsd /org/ganesha/nfsd/ExportMgr org.ganesha.nfsd.exportmgr.RemoveExport uint16:%s' % eid)
 
 
 def RemoveOneExporter(dirname):
@@ -421,6 +426,8 @@ def stopotherservices():
     sudo("systemctl stop automata")
     sudo("systemctl stop smb")
     sudo('systemctl stop nfs-ganesha')
+    #in old versions, maybe nfsd is running, so we clean it.
+    sudo('systemctl stop nfs')
 
 @roles('allnodes')
 def startotherservices():
