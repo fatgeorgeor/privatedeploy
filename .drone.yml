@@ -2,11 +2,11 @@ pipeline:
   build:
     image: plugins/git
     commands:
-      - "sh build.sh"
+      - "sh package/rpmbuild.sh"
   github_release:
     image: plugins/github-release
     files:
-      - "*.tar.gz"
+      - "*.rpm"
     secrets: [github_token]
     checksum:
       - md5
@@ -15,7 +15,7 @@ pipeline:
   s3:
     image: plugins/s3
     bucket: jmdrepo
-    source: "*.tar.gz"
+    source: "*.rpm"
     secrets: [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]
     path_style: false
     acl: public-read
