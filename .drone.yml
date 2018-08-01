@@ -1,6 +1,6 @@
 pipeline:
   build:
-    image: plugins/git
+    image: centos:7.2.1511
     commands:
       - yum install -y git rpm-build
       - "sh package/rpmbuild.sh"
