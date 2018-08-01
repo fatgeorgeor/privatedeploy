@@ -2,6 +2,7 @@ pipeline:
   build:
     image: plugins/git
     commands:
+      - yum install -y git rpm-build
       - "sh package/rpmbuild.sh"
   github_release:
     image: plugins/github-release
