@@ -10,6 +10,7 @@ import json
 import copy
 import pdb
 import re
+import random
 import os.path
 from jinja2 import Template
 import cephfs as libcephfs
@@ -41,6 +42,19 @@ SAMBA_CONFIG_TEMPLATE = '''[{{ mountpoint }}]
         valid users = fsuser 
         write list = fsuser\n
 '''
+GANESHA_CONFIG_TEMPLATE = """
+# this is for nfs {{ path }} only, never remove it.
+EXPORT
+{
+	Export_ID = {{ exportid }};
+	Path = /{{ path }};
+	Pseudo = /{{ path }};
+	Access_Type = RW;
+	FSAL {
+		Name = CEPH;
+	}
+}
+"""
 
 
 def loadConfiguration(file):
@@ -315,6 +329,12 @@ def addOneExporter(dirname):
     content = t.render(mountpoint=dirname)
     sudo('echo "%s" >> /etc/samba/smb.conf' % content)
     sudo('systemctl reload smb')
+    t2 = Template(GANESHA_CONFIG_TEMPLATE)
+    eid = sudo('python /etc/ganesha/getid.py')
+    content2 = t2.render(exportid=eid, path=dirname)
+    sudo('echo "%s" >> /etc/ganesha/ganesha.conf' % content2)
+    sudo('systemctl reload nfs-ganesha')
+
 
 def AddOneExporter(dirname):
     LoadConfig()
@@ -342,6 +362,9 @@ def removeOneExporter(dirname):
     smbstr = "\[%s\]" % dirname
     sudo('sed -i "/%s/,+9d" /etc/samba/smb.conf' % smbstr)
     sudo('systemctl reload smb')
+    nfsstr = "# this is for nfs %s only, never remove it." % dirname
+    sudo('sed -i "/%s/,+12d" /etc/ganesha/ganesha.conf' % nfsstr)
+    sudo('systemctl reload nfs-ganesha')
 
 
 def RemoveOneExporter(dirname):
@@ -397,6 +420,7 @@ def stopotherservices():
     sudo("systemctl stop niergui")
     sudo("systemctl stop automata")
     sudo("systemctl stop smb")
+    sudo('systemctl stop nfs-ganesha')
 
 @roles('allnodes')
 def startotherservices():
@@ -404,6 +428,7 @@ def startotherservices():
     sudo("systemctl start niergui")
     sudo("systemctl start automata")
     sudo('systemctl start smb')
+    sudo('systemctl start nfs-ganesha')
 
 @parallel
 @roles('allnodes')
@@ -607,7 +632,10 @@ def config_keepalivedbasic_smbnfs():
     put('resources/keepalived.conf', '/etc/keepalived/keepalived.conf', use_sudo=True)
     sudo('systemctl enable keepalived')
     sudo('systemctl enable smb')
+    sudo('systemctl enable nfs-ganesha')
     put('resources/smb.conf', '/etc/samba/smb.conf', use_sudo=True)
+    put('resources/ganesha.conf', '/etc/ganesha/ganesha.conf', use_sudo=True)
+    put('resources/getid.py', '/etc/ganesha/getid.py')
     put('resources/getnic.sh', '/tmp/getnic.sh', use_sudo=True)
     sudo('echo -n > /etc/exports')
 
