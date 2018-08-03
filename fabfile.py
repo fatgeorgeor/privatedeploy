@@ -509,6 +509,8 @@ def ChangeIp():
         print("must have same size of monitors and osds")
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(stop_keepalived)
+            execute(stopotherservices)
             execute(stopcephservice)
             for i in env.roledefs['allnodes']:
                 execute(whoami, host=i)
@@ -517,6 +519,8 @@ def ChangeIp():
                 execute(config_keepalived_interface, host=i)
             execute(changemonitorconfig)
             execute(startcephservice)
+            execute(startotherservices)
+            execute(start_keepalived)
             execute(updateconfigfile, oconfig=oconfig)
 
     Prometheus()
