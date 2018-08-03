@@ -603,7 +603,7 @@ def SetNtpServer(ip):
 def Prometheus_node():
             put('resources/prometheus.yaml', '/etc/prometheus/', use_sudo=True)
             put('resources/node_targets.yaml', '/etc/prometheus/', use_sudo=True)
-            for ip in USERDEINEDCONFIG['ips']: 
+            for ip in env.roledefs['allnodes']:
                 sudo("echo '" + "    - \"" + ip + ":9100\"' >> /etc/prometheus/node_targets.yaml");
 
             sudo("systemctl restart prometheus");
