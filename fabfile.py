@@ -34,6 +34,8 @@ DEPLOYDIR = '/opt/cephdeploy'
 SAMBA_CONFIG_TEMPLATE = '''[{{ mountpoint }}]
         path = /{{ mountpoint }}
         vfs objects = ceph
+        ceph:aio = true
+        ceph:defered close = true
         writable = yes
         browseable = yes
         available = yes
@@ -192,6 +194,7 @@ def osds_makedeploydir():
 @roles('osds')
 def osds_copydeployfiles():
     put("*", DEPLOYDIR)
+    put("/etc/ceph/ceph.conf", DEPLOYDIR)
     
 def DeployOsds():
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
@@ -208,6 +211,7 @@ def all_copykeyring():
     # note put/append can add use_sudo=True to pass permission issue.
     put("./ceph.client.admin.keyring", "/etc/ceph/", use_sudo=True)
     put("./ceph.conf", "/etc/ceph/", use_sudo=True)
+    append('/etc/ceph/ceph.conf', 'mon_osd_min_in_ratio = 0.3')
 
 @parallel
 @roles('allnodes')
@@ -362,7 +366,7 @@ def removeOneExporter(dirname):
     exportstr = '\\/%s ' % dirname
     sudo('sed -i "%s/d" /etc/exports' % exportstr)
     smbstr = "\[%s\]" % dirname
-    sudo('sed -i "/%s/,+9d" /etc/samba/smb.conf' % smbstr)
+    sudo('sed -i "/%s/,+11d" /etc/samba/smb.conf' % smbstr)
     sudo('systemctl reload smb')
     nfsstr = "# this is for nfs %s only, never remove it." % dirname
     sudo('sed -i "/%s/,+12d" /etc/ganesha/ganesha.conf' % nfsstr)
