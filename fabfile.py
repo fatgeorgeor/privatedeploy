@@ -580,6 +580,15 @@ def AddNewDisk(hostname, diskname):
             with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
                 execute(addOneOsd, hostname=hostname, diskname=diskname, host=hostname)
     
+def cleardisk(hostname, diskname):
+    run('dd if=/dev/zero of=%s bs=128M count=1' % diskname)
+
+def ClearDisk(hostname, diskname):
+    LoadConfig()
+    with settings(warn_only=True):
+        with cd(DEPLOYDIR):
+            with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+                execute(cleardisk, hostname=hostname, diskname=diskname, host=hostname)
 # -------- functions to add new disk as new osd end ------------------------------#
 
 # -------- functions to add new disk as new osd begin------------------------------#
