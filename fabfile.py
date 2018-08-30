@@ -454,6 +454,7 @@ def stopcephservice():
 def startcephservice():
     sudo('sed -i "/mon_host/d" /etc/ceph/ceph.conf')
     append('/etc/ceph/ceph.conf', 'mon_host = %s' % USERDEINEDCONFIG['monitorip_sep'], use_sudo=True)
+    put('/etc/ceph/ceph.conf', DEPLOYDIR)
     # in case to many failed times for these targets
     sudo("systemctl reset-failed ceph-mon@%s.service" % env.host)
     sudo("systemctl reset-failed ceph-mgr@%s.service" % env.host)
