@@ -211,7 +211,6 @@ def all_copykeyring():
     # note put/append can add use_sudo=True to pass permission issue.
     put("./ceph.client.admin.keyring", "/etc/ceph/", use_sudo=True)
     put("./ceph.conf", "/etc/ceph/", use_sudo=True)
-    append('/etc/ceph/ceph.conf', 'mon_osd_min_in_ratio = 0.3')
 
 @parallel
 @roles('allnodes')
@@ -236,6 +235,9 @@ def all_cleancephdatawithmercy():
 
 def local_createmonitorsandmgrs(mons):
     local("ceph-deploy --overwrite-conf new " + mons)
+    local("echo 'mon_osd_min_in_ratio = 0.3' >> ceph.conf")
+    local("echo 'mon_osd_full_ratio = 0.999' >> ceph.conf")
+    local("echo 'osd_failsafe_full_ratio = 0.9999' >> ceph.conf")
     local("ceph-deploy --overwrite-conf mon create " + mons)
     time.sleep(30)
     local("ceph-deploy gatherkeys " +  mons)
