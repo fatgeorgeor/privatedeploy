@@ -571,7 +571,7 @@ def GetDate():
 
 # -------- functions to add new disk as new osd begin------------------------------#
 def addOneOsd(hostname, diskname):
-    run('if [ -b %s ];then dd if=/dev/zero of=%s bs=1M count=128; fi' % (diskname, diskname))
+    run('if [ -b %s ];then dd if=/dev/zero of=%s bs=1M count=128;else exit 1; fi' % (diskname, diskname))
     run('ceph-deploy --overwrite-conf osd create --zap-disk %s:%s' % (hostname, diskname))
     
 
@@ -583,7 +583,7 @@ def AddNewDisk(hostname, diskname):
                 execute(addOneOsd, hostname=hostname, diskname=diskname, host=hostname)
     
 def cleardisk(hostname, diskname):
-    run('if [ -b %s ];then dd if=/dev/zero of=%s bs=1M count=128; fi' % (diskname, diskname))
+    run('if [ -b %s ];then dd if=/dev/zero of=%s bs=1M count=128;else exit 1; fi' % (diskname, diskname))
 
 def ClearDisk(hostname, diskname):
     LoadConfig()
