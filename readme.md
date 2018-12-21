@@ -1,12 +1,11 @@
-1、安装ceph-common ceph-osd ceph-mon fabric ceph-deploy等包;
+1、安装ceph-common ceph-osd ceph-mon fabric ceph-deploy等包;  
 2、配置config.json，包含的字段包括:
 - monitors: 一个数组，集群需要安装的monitor列表;
 - osdnodes: 一个数组，集群需要安装的osd服务器列表;
 - user: 进行部署的用户, 一般填root即可;
 - password: user用户的密码;
-- clusterinfo: 用于配置特定于集群的信息，用以区分不同集群;
 - ntpserverip: ntp服务器的ip地址;
-- disks: 配置每台服务器的ssd和hdd盘符名称, ceph-deploy会使用ssd来存储wal和rocksdb;
+- disks: 配置每台服务器的ssd和hdd盘符名称, ceph-deploy会使用ssd来存储wal和rocksdb;  
 典型的配置示例如下：
 ```
 {
@@ -22,7 +21,6 @@
     ],
     "user": "root",
     "password": "test",
-    "clusterinfo": "storage-stor",
     "ntpserverip": "10.70.140.20",
     "disks": {
         "192.168.0.154": {
