@@ -1,0 +1,6 @@
+[ceph]
+name=ceph
+#baseurl=http://download.fedoraproject.org/pub/epel/7/$basearch
+baseurl=http://us-west.ceph.com/rpm-luminous/el7/x86_64/
+enabled=1
+gpgcheck=no

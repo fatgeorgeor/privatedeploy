@@ -1,22 +1,29 @@
 {
     "monitors": [
-        "10.70.249.6",
-        "10.70.249.60",
-        "10.70.249.34"
+        "192.168.0.154",
+        "192.168.0.155",
+        "192.168.0.156"
     ],
     "osdnodes": [
-        "10.70.249.6",
-        "10.70.249.60",
-        "10.70.249.34"
+        "192.168.0.154",
+        "192.168.0.155",
+        "192.168.0.156"
     ],
-    "user": "root",
-    "password": "Eking1234!",
-    "clusterinfo": "storage-stor",
+    "user": "cloud-user",
+    "password": "Test@6666",
     "ntpserverip": "10.70.140.20",
-    "vip": "10.70.249.51",
     "disks": {
-        "10.70.249.6":["/dev/vde","/dev/vdb", "/dev/vdf" ],
-        "10.70.249.60":["/dev/vdd","/dev/vdc", "/dev/vdb"],
-        "10.70.249.34":["/dev/vdd","/dev/vdc", "/dev/vdb"]
+        "192.168.0.154": {
+		"ssds": ["/dev/vdb", "/dev/vdc"],
+		"hdds": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
+	},
+        "192.168.0.155": {
+		"ssds": ["/dev/vdb", "/dev/vdc"],
+		"hdds": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
+	},
+        "192.168.0.156": {
+		"ssds": ["/dev/vdb", "/dev/vdc"],
+		"hdds": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
+	}
     }
 }

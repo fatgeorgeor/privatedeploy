@@ -1,8 +1,0 @@
-{
-    "newmonitors": ["10.16.0.240", "10.16.0.241", "10.16.0.242"],
-    "newosdnodes": ["10.16.0.240", "10.16.0.241", "10.16.0.242", "10.16.0.243"],
-    "clusterinfo": "storage-cluster",
-    "user":  "root",
-    "password":  "Eking1234!",
-    "newvip":  "10.16.0.244"
-}
