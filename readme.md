@@ -4,8 +4,9 @@
 - osdnodes: 一个数组，集群需要安装的osd服务器列表;
 - user: 进行部署的用户, 一般填root即可;
 - password: user用户的密码;
-- ntpserverip: ntp服务器的ip地址;
+- chronyservers: chrony服务器的ip地址;
 - disks: 配置每台服务器的ssd和hdd盘符名称, ceph-deploy会使用ssd来存储wal和rocksdb;  
+- databasesize: 每个osd的rocksdb大小, 单位是GiB.  
 典型的配置示例如下：
 ```
 {
@@ -21,7 +22,8 @@
     ],
     "user": "root",
     "password": "test",
-    "ntpserverip": "10.70.140.20",
+    "chronyservers": "10.70.140.20",
+    "databasesize": 10,
     "disks": {
         "192.168.0.154": {
         "ssds": ["/dev/vdb", "/dev/vdc"],
@@ -42,5 +44,26 @@
 ```
 python fabfile.py
 ```
+
+4、通过集群本脚本扩容一个磁盘:  
+```
+fab AddNewDisk:hostname=ceph168,ssd=/dev/vdb,hdd=/dev/vdd,databasesize=10
+```
+在上面的命令行中，AddNewDisk是扩容时执行的函数，hostname是扩容磁盘所在的机器的hostname(或者是IP),   
+ssd是存储rocksdb的wal和db的位置，hdd是存储osd数据的磁盘，databasesize是rocksdb的db的大小。  
+
+5、关于databasesize的计算准则
+为了提升ceph的性能，我们使用ssd来存储bluestore的rocksdb的db和wal，用hdd来存储osd的数据。因为ssd有限，所以我们  
+会将ssd划分为多个分区来使用。根据ceph官网的推荐，存储rocksdb的db的分区大小应至少达到hdd容量的4%，即一个6TB的hdd大概  
+需要对应240G的ssd空间来存储rocksdb的db, 另外还需要10GB来存储rocksdb的wal。  
+在进行常规初始化部署和osd扩容时，都需要根据这个准则来计算databasesize.  
+比如在一个典型应用场景中，有两块896G的ssd和6块6T的HDD，那么每三个hdd需要共享一个ssd，首先，三个hdd需要占用3个10GB来存储  
+wal，剩下的ssd空间就是866GB, 存在rocksdb的db的空间就是866/3=288，也就是说databasesize应配置为288.
+
+
+
+
+
+
 
 
