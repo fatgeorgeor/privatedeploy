@@ -48,6 +48,11 @@ def all_systemconfig():
 
 @parallel
 @roles('allnodes')
+def all_copyscripts():
+    put('resources/clearcephlvm.sh', '/tmp/', use_sudo=True)
+
+@parallel
+@roles('allnodes')
 def all_sshnopassword():
     deploynodekey = read_key_file(SSHPUBFILE)
     # note that we need to login to myself to deploy osds, so we auth ourself
@@ -113,20 +118,7 @@ def Init():
         execute(all_sshnopassword)
         with settings(warn_only=True):
             execute(all_systemconfig)
-
-@parallel
-@roles('allnodes')
-def all_installceph():
-    with settings(warn_only=True):
-    	put('resources/ceph.repo', '/etc/yum.repos.d/ceph.repo', use_sudo=True)
-    	put('resources/ceph-deploy-2.0.1-0.noarch.rpm', '/tmp/ceph-deploy-2.0.1-0.noarch.rpm', use_sudo=True)
-    	put('resources/clearcephlvm.sh', '/tmp/', use_sudo=True)
-        sudo('yum install chrony ceph ceph-common ceph-osd ceph-mgr ceph-mon -y')
-        sudo('yum localinstall /tmp/ceph-deploy-2.0.1-0.noarch.rpm -y')
-
-def InstallCeph():
-    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-        execute(all_installceph)
+        execute(all_copyscripts)
 
 # -------- functions deploy osds begin------------------------------#
 @parallel
@@ -183,7 +175,6 @@ def DeployOsds():
         with settings(warn_only=True):
             execute(osd_deployosds)
 # -------- functions deploy osds end ------------------------------#
-# -------- functions deploy monitors and mgrs begin------------------------------#
 @parallel
 @roles('allnodes')
 def all_copykeyring():
@@ -227,8 +218,6 @@ def CreateMonMgr():
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
         	execute(all_copykeyring)
 
-# -------- functions deploy monitors and mgrs begin------------------------------#
-
 @parallel
 @roles('allnodes')
 def stopcephservice():
@@ -236,7 +225,6 @@ def stopcephservice():
     sudo("systemctl stop ceph-mgr.target")
     sudo("systemctl stop ceph-mon.target")
 
-# -------- functions to add new disk as new osd begin------------------------------#
 def addOneOsd(hostname, diskname):
     run('if [ -b %s ];then dd if=/dev/zero of=%s bs=1M count=128;else exit 1; fi' % (diskname, diskname))
     run('ceph-deploy --overwrite-conf osd create --zap-disk %s:%s' % (hostname, diskname))
@@ -258,12 +246,12 @@ def ClearDisk(hostname, diskname):
         with cd(DEPLOYDIR):
             with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
                 execute(cleardisk, hostname=hostname, diskname=diskname, host=hostname)
-# -------- functions to add new disk as new osd end ------------------------------#
 
-# -------- functions to add new disk as new osd begin------------------------------#
 @parallel
 @roles('allnodes')
 def setChrony():
+    #chrony is not supposed to be install in this iso, will add soon
+    sudo('yum install chrony -y')
     sudo('sed -i "/server /d" /etc/chrony.conf')
 
     for ip in USERDEINEDCONFIG['chronyservers']:
@@ -276,8 +264,6 @@ def SetChronyServers():
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(setChrony)
-# -------- functions to add new disk as new osd end ------------------------------#
-
 
 def getosdcountandstat():
     s = json.loads(run('ceph osd stat -f json-pretty'))
@@ -291,7 +277,6 @@ def getosdcountandstat():
         print ('\33[102m' +  "cluster deployed SUCCESSFULLY" + '\033[0m')
     else:
         print ('\033[91m' + "some osds is FAILED, please double check your configuration" + '\033[0m')
-        
 
 def CheckOsdCount():
     print "waiting for deploy results............"
@@ -302,7 +287,6 @@ def CheckOsdCount():
 
 if __name__ == "__main__":
     Init()
-    InstallCeph()
     SetChronyServers()
     ProcessMonitorHostname()
     CreateMonMgr()
