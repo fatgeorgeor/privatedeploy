@@ -83,7 +83,7 @@ def LoadConfig():
         exit(-1)
 
     USERDEINEDCONFIG['disks'] = config["disks"]
-    USERDEINEDCONFIG['ntpserverip'] = config["ntpserverip"]
+    USERDEINEDCONFIG['chronyservers'] = config["chronyservers"]
     USERDEINEDCONFIG['monitorhostnames'] = ''
     USERDEINEDCONFIG['ips'] = config["osdnodes"]
 
@@ -121,7 +121,7 @@ def all_installceph():
     	put('resources/ceph.repo', '/etc/yum.repos.d/ceph.repo', use_sudo=True)
     	put('resources/ceph-deploy-2.0.1-0.noarch.rpm', '/tmp/ceph-deploy-2.0.1-0.noarch.rpm', use_sudo=True)
     	put('resources/clearcephlvm.sh', '/tmp/', use_sudo=True)
-        sudo('yum install ceph ceph-common ceph-osd ceph-mgr ceph-mon -y')
+        sudo('yum install chrony ceph ceph-common ceph-osd ceph-mgr ceph-mon -y')
         sudo('yum localinstall /tmp/ceph-deploy-2.0.1-0.noarch.rpm -y')
 
 def InstallCeph():
@@ -263,31 +263,25 @@ def ClearDisk(hostname, diskname):
 # -------- functions to add new disk as new osd begin------------------------------#
 @parallel
 @roles('allnodes')
-def setNtp(ip):
-    sudo('sed -i "/server /d" /etc/ntp.conf')
-    sudo('sed -i "/ntpserver /d" /etc/hosts')
-    sudo('sed -i "/ntpserver/d" /usr/lib/systemd/system/ntpd.service')
-    append('/etc/ntp.conf', 'server ntpserver iburst', use_sudo=True)
-    append('/etc/hosts', '%s ntpserver' % ip, use_sudo=True)
-    append('/etc/sysconfig/ntpd', 'SYNC_HWCLOCK=yes', use_sudo=True)
-    append('/etc/sysconfig/ntpd', 'NTPDATE_OPTIONS=""', use_sudo=True)
-    append('/etc/sysconfig/ntpd', 'OPTIONS="-g"', use_sudo=True)
-    sudo('sed -i "/ExecStart/aExecStartPre=/usr/sbin/ntpdate ntpserver" /usr/lib/systemd/system/ntpd.service')
-    sudo('sed -i "/ExecStartPre/aExecStopPost=/usr/sbin/ntpdate ntpserver" /usr/lib/systemd/system/ntpd.service')
-    sudo('systemctl daemon-reload')
-    sudo('systemctl restart ntpd')
+def setChrony():
+    sudo('sed -i "/server /d" /etc/chrony.conf')
 
-def SetNtpServer(ip):
-    LoadConfig()
+    for ip in USERDEINEDCONFIG['chronyservers']:
+        append('/etc/chrony.conf', 'server %s iburst' % ip, use_sudo=True)
+
+    sudo('systemctl daemon-reload')
+    sudo('systemctl restart chronyd')
+
+def SetChronyServers():
     with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(setNtp, ip=ip)
+            execute(setChrony)
 # -------- functions to add new disk as new osd end ------------------------------#
 
 if __name__ == "__main__":
     Init()
     InstallCeph()
-    SetNtpServer(USERDEINEDCONFIG['ntpserverip'])
+    SetChronyServers()
     ProcessMonitorHostname()
     CreateMonMgr()
     DeployOsds()

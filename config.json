@@ -1,29 +1,29 @@
 {
     "monitors": [
-        "192.168.0.154",
-        "192.168.0.155",
-        "192.168.0.156"
+        "172.20.13.168",
+        "172.20.13.169",
+        "172.20.13.170"
     ],
     "osdnodes": [
-        "192.168.0.154",
-        "192.168.0.155",
-        "192.168.0.156"
+        "172.20.13.168",
+        "172.20.13.169",
+        "172.20.13.170"
     ],
-    "user": "cloud-user",
-    "password": "Test@6666",
-    "ntpserverip": "10.70.140.20",
+    "user": "root",
+    "password": "1qaz@WSX",
+    "chronyservers": ["51.75.17.219", "202.108.6.95"],
     "disks": {
-        "192.168.0.154": {
-		"ssds": ["/dev/vdb", "/dev/vdc"],
-		"hdds": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
+        "172.20.13.168": {
+		"ssds": ["/dev/vdb"],
+		"hdds": ["/dev/vda"]
 	},
-        "192.168.0.155": {
-		"ssds": ["/dev/vdb", "/dev/vdc"],
-		"hdds": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
+        "172.20.13.169": {
+		"ssds": ["/dev/vdb"],
+		"hdds": ["/dev/vda"]
 	},
-        "192.168.0.156": {
-		"ssds": ["/dev/vdb", "/dev/vdc"],
-		"hdds": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
+        "172.20.13.170": {
+		"ssds": ["/dev/vdb"],
+		"hdds": ["/dev/vda"]
 	}
     }
 }
