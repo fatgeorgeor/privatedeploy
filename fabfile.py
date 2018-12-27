@@ -227,17 +227,42 @@ def stopcephservice():
     sudo("systemctl stop ceph-mgr.target")
     sudo("systemctl stop ceph-mon.target")
 
-def addOneOsd(hostname, diskname):
-    run('if [ -b %s ];then dd if=/dev/zero of=%s bs=1M count=128;else exit 1; fi' % (diskname, diskname))
-    run('ceph-deploy --overwrite-conf osd create --zap-disk %s:%s' % (hostname, diskname))
+def addOneOsd(ssd, hdd, databasesize):
+    s = sudo("blkid | grep %s | awk -F':' '{print $1}' | awk -F'%s' '{print $2}'" %(ssd, ssd))
+    partset = set()
+    for i in s:
+        if i != '\r' and i != '\n':
+            partset.add(i)
+
+    sudo('sgdisk -n 0:0:+%sG %s' % (databasesize, ssd))
+    sudo('partprobe %s' % (ssd))
+
+    s = sudo("blkid | grep %s | awk -F':' '{print $1}' | awk -F'%s' '{print $2}'" %(ssd, ssd))
+    partset_afterdb = set()
+    for i in s:
+        if i != '\r' and i != '\n':
+            partset_afterdb.add(i)
+    dbpartnum = int((partset_afterdb - partset).pop())
+
+    sudo('sgdisk -n 0:0:+5G %s' % (ssd))
+    sudo('partprobe %s' % (ssd))
+    s = sudo("blkid | grep %s | awk -F':' '{print $1}' | awk -F'%s' '{print $2}'" %(ssd, ssd))
+    partset_afterwal = set()
+    for i in s:
+        if i != '\r' and i != '\n':
+            partset_afterwal.add(i)
+
+    walnum = int((partset_afterwal - partset_afterdb).pop())
+
+    run('ceph-deploy --overwrite-conf osd create --block-db %s%d --block-wal %s%d --data %s %s' % (ssd, dbpartnum, ssd, walnum, hdd, env.host))
     
 
-def AddNewDisk(hostname, diskname):
+def AddNewDisk(hostname, ssd, hdd, databasesize):
     LoadConfig()
     with settings(warn_only=True):
         with cd(DEPLOYDIR):
             with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-                execute(addOneOsd, hostname=hostname, diskname=diskname, host=hostname)
+                execute(addOneOsd, ssd=ssd, hdd=hdd, databasesize=databasesize, host=hostname)
     
 @parallel
 @roles('allnodes')
