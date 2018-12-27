@@ -120,6 +120,7 @@ def Init():
         with settings(warn_only=True):
             execute(all_systemconfig)
         execute(all_copyscripts)
+    local("rm *keyring* -f")
 
 # -------- functions deploy osds begin------------------------------#
 @parallel
