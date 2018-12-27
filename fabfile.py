@@ -94,9 +94,6 @@ def whoami():
     hostname = run('hostname -s')
     moniphostnamedict[env.host] = hostname
 
-def local_hostsrestore(hostip, hostname):
-    local('cp /tmp/hosts /etc/hosts')
-
 def ProcessMonitorHostname():
     for i in env.roledefs['monitors']:
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
@@ -109,13 +106,6 @@ def ProcessMonitorHostname():
         USERDEINEDCONFIG['monitorhostnames'] += hostname + " "
         local("echo %s %s >> /etc/hosts" % (ip, hostname))
 
-
-def RestoreMonitorHostname():
-    local('cp /tmp/hosts /etc/hosts')
-
-    
-
-
 def Init():
     LoadConfig()
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
@@ -123,6 +113,7 @@ def Init():
         execute(all_sshnopassword)
         with settings(warn_only=True):
             execute(all_systemconfig)
+
 @parallel
 @roles('allnodes')
 def all_installceph():
@@ -130,12 +121,13 @@ def all_installceph():
     	put('resources/ceph.repo', '/etc/yum.repos.d/ceph.repo', use_sudo=True)
     	put('resources/ceph-deploy-2.0.1-0.noarch.rpm', '/tmp/ceph-deploy-2.0.1-0.noarch.rpm', use_sudo=True)
     	put('resources/clearcephlvm.sh', '/tmp/', use_sudo=True)
-        sudo('yum install ntp ceph ceph-common ceph-osd ceph-mgr ceph-mon -y')
+        sudo('yum install ceph ceph-common ceph-osd ceph-mgr ceph-mon -y')
         sudo('yum localinstall /tmp/ceph-deploy-2.0.1-0.noarch.rpm -y')
 
 def InstallCeph():
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
         execute(all_installceph)
+
 # -------- functions deploy osds begin------------------------------#
 @parallel
 @roles('osds')
@@ -224,6 +216,7 @@ def local_createmonitorsandmgrs(mons):
     time.sleep(30)
     local("ceph-deploy gatherkeys " +  mons)
     local("ceph-deploy --overwrite-conf mgr create " + mons)
+    local("cp /tmp/hosts /etc/hosts")
 
 def CreateMonMgr():
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
@@ -236,11 +229,6 @@ def CreateMonMgr():
 
 # -------- functions deploy monitors and mgrs begin------------------------------#
 
-# -------- functions processing hostname and /etc/hosts file begin------------------------------#
-
-# -------- functions processing hostname and /etc/hosts file end ------------------------------#
-
-    
 @parallel
 @roles('allnodes')
 def stopcephservice():
@@ -303,4 +291,3 @@ if __name__ == "__main__":
     ProcessMonitorHostname()
     CreateMonMgr()
     DeployOsds()
-    RestoreMonitorHostname()
