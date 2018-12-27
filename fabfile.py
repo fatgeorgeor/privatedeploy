@@ -11,6 +11,7 @@ import copy
 import re
 import random
 import os.path
+import pdb
 
 # note:
 # 1. All functions start with Capital words are called in main function.
@@ -85,7 +86,6 @@ def LoadConfig():
     USERDEINEDCONFIG['disks'] = config["disks"]
     USERDEINEDCONFIG['chronyservers'] = config["chronyservers"]
     USERDEINEDCONFIG['monitorhostnames'] = ''
-    USERDEINEDCONFIG['ips'] = config["osdnodes"]
 
 
 moniphostnamedict = {}
@@ -278,6 +278,28 @@ def SetChronyServers():
             execute(setChrony)
 # -------- functions to add new disk as new osd end ------------------------------#
 
+
+def getosdcountandstat():
+    s = json.loads(run('ceph osd stat -f json-pretty'))
+
+    totalosds = 0
+    for _, disks in USERDEINEDCONFIG['disks'].items():
+        hdds = disks['hdds']
+        totalosds += len(hdds)
+
+    if s["num_osds"] == s["num_up_osds"] == s["num_in_osds"] == totalosds:
+        print ('\33[102m' +  "cluster deployed SUCCESSFULLY" + '\033[0m')
+    else:
+        print ('\033[91m' + "some osds is FAILED, please double check your configuration" + '\033[0m')
+        
+
+def CheckOsdCount():
+    print "waiting for deploy results............"
+    time.sleep(10)
+    LoadConfig()
+    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+        execute(getosdcountandstat, host=env.roledefs['monitors'][0])
+
 if __name__ == "__main__":
     Init()
     InstallCeph()
@@ -285,3 +307,4 @@ if __name__ == "__main__":
     ProcessMonitorHostname()
     CreateMonMgr()
     DeployOsds()
+    CheckOsdCount()
