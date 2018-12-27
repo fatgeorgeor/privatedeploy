@@ -91,6 +91,7 @@ def LoadConfig():
     USERDEINEDCONFIG['disks'] = config["disks"]
     USERDEINEDCONFIG['chronyservers'] = config["chronyservers"]
     USERDEINEDCONFIG['monitorhostnames'] = ''
+    USERDEINEDCONFIG['databasesize'] = config['databasesize']
 
 
 moniphostnamedict = {}
@@ -148,7 +149,7 @@ def osd_deployosds():
                     for index, hdd in enumerate(hdds):
                         sudo('dd if=/dev/zero of=%s bs=128M count=1' % hdd)
                         ssd = ssds[index % ssdnum]
-                        sudo('sgdisk -n 0:0:+5G %s' % (ssd))
+                        sudo('sgdisk -n 0:0:+%dG %s' % (USERDEINEDCONFIG['databasesize'], ssd))
                         sudo('sgdisk -n 0:0:+5G %s' % (ssd))
                         sudo('partprobe %s' % (ssd))
                         partitionmap[ssd] += 2
