@@ -239,16 +239,6 @@ def AddNewDisk(hostname, diskname):
             with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
                 execute(addOneOsd, hostname=hostname, diskname=diskname, host=hostname)
     
-def cleardisk(hostname, diskname):
-    run('if [ -b %s ];then dd if=/dev/zero of=%s bs=1M count=128;else exit 1; fi' % (diskname, diskname))
-
-def ClearDisk(hostname, diskname):
-    LoadConfig()
-    with settings(warn_only=True):
-        with cd(DEPLOYDIR):
-            with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-                execute(cleardisk, hostname=hostname, diskname=diskname, host=hostname)
-
 @parallel
 @roles('allnodes')
 def setChrony():
