@@ -151,7 +151,7 @@ def osd_deployosds():
                         sudo('dd if=/dev/zero of=%s bs=128M count=1' % hdd)
                         ssd = ssds[index % ssdnum]
                         sudo('sgdisk -n 0:0:+%dG %s' % (USERDEINEDCONFIG['databasesize'], ssd))
-                        sudo('sgdisk -n 0:0:+5G %s' % (ssd))
+                        sudo('sgdisk -n 0:0:+10G %s' % (ssd))
                         sudo('partprobe %s' % (ssd))
                         partitionmap[ssd] += 2
                         dbpath = ssd + "%s" % (partitionmap[ssd]-2)
@@ -244,7 +244,7 @@ def addOneOsd(ssd, hdd, databasesize):
             partset_afterdb.add(i)
     dbpartnum = int((partset_afterdb - partset).pop())
 
-    sudo('sgdisk -n 0:0:+5G %s' % (ssd))
+    sudo('sgdisk -n 0:0:+10G %s' % (ssd))
     sudo('partprobe %s' % (ssd))
     s = sudo("blkid | grep %s | awk -F':' '{print $1}' | awk -F'%s' '{print $2}'" %(ssd, ssd))
     partset_afterwal = set()
