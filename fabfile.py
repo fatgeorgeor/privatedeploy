@@ -92,6 +92,7 @@ def LoadConfig():
     USERDEINEDCONFIG['chronyservers'] = config["chronyservers"]
     USERDEINEDCONFIG['monitorhostnames'] = ''
     USERDEINEDCONFIG['databasesize'] = config['databasesize']
+    USERDEINEDCONFIG['shouldinstallpromethues'] = config['shouldinstallpromethues']
 
 
 moniphostnamedict = {}
@@ -302,6 +303,50 @@ def CheckOsdCount():
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
         execute(getosdcountandstat, host=env.roledefs['monitors'][0])
 
+@parallel
+@roles('allnodes')
+def all_installnodeexporter():
+    #chrony is not supposed to be install in this iso, will add soon
+    put('resources/node_exporter-0.17.0-1.el7.centos.x86_64.rpm', '/tmp', use_sudo=True)
+    sudo("yum localinstall /tmp/node_exporter-0.17.0-1.el7.centos.x86_64.rpm -y")
+    sudo('systemctl daemon-reload')
+    sudo('systemctl enable node_exporter')
+    sudo('systemctl restart node_exporter')
+
+
+def DeployPrometheus():
+    LoadConfig()
+    with settings(warn_only=True):
+        local("yum localinstall resources/*.rpm -y")
+        local("cp resources/prometheus.yml /etc/prometheus/")
+        local("cp resources/ceph_exporter /usr/bin/")
+        local("cp resources/ceph_exporter.service /etc/systemd/system/ceph_exporter.service")
+    with settings(warn_only=True):
+        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(all_installnodeexporter)
+
+    local("systemctl daemon-reload")
+    local("systemctl enable ceph_exporter")
+    local("systemctl enable prometheus")
+    local("systemctl enable grafana-server")
+    local("echo '  - job_name: \"ceph\"' >> /etc/prometheus/prometheus.yml")
+    local("echo '    static_configs: ' >> /etc/prometheus/prometheus.yml")
+    local("echo '    - targets: [\'localhost:9128\']' >> /etc/prometheus/prometheus.yml")
+    
+
+    local("systemctl restart ceph_exporter")
+    local("systemctl restart prometheus")
+    local("systemctl restart grafana-server")
+
+    for i in env.roledefs["allnodes"]:
+        local("echo '  - job_name: \"%s\"' >> /etc/prometheus/prometheus.yml" % i)
+        local("echo '    static_configs: ' >> /etc/prometheus/prometheus.yml")
+        local("echo '    - targets: [%s:9100]' >> /etc/prometheus/prometheus.yml" % i)
+
+def CleanPrometheus():
+    local("systemctl stop prometheus")
+    local("rm /var/lib/prometheus/data -rf")
+
 if __name__ == "__main__":
     Init()
     SetChronyServers()
@@ -309,3 +354,6 @@ if __name__ == "__main__":
     CreateMonMgr()
     DeployOsds()
     CheckOsdCount()
+    if USERDEINEDCONFIG["shouldinstallpromethues"]:
+        CleanPrometheus()
+        DeployPrometheus()

@@ -17,14 +17,15 @@
         "172.20.13.168": {
 		"ssds": ["/dev/vdb"],
 		"hdds": ["/dev/vda"]
-	},
+	    },
         "172.20.13.169": {
 		"ssds": ["/dev/vdb"],
 		"hdds": ["/dev/vda"]
-	},
+	    },
         "172.20.13.170": {
 		"ssds": ["/dev/vdb"],
 		"hdds": ["/dev/vda"]
-	}
-    }
+	    }
+    },
+    "shouldinstallpromethues": true
 }
