@@ -344,8 +344,9 @@ def DeployPrometheus():
         local("echo '    - targets: [%s:9100]' >> /etc/prometheus/prometheus.yml" % i)
 
 def CleanPrometheus():
-    local("systemctl stop prometheus")
-    local("rm /var/lib/prometheus/data -rf")
+    with settings(warn_only=True):
+        local("systemctl stop prometheus")
+        local("rm /var/lib/prometheus/data -rf")
 
 if __name__ == "__main__":
     Init()
