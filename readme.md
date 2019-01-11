@@ -42,9 +42,18 @@
     "shouldinstallpromethues": true
 }
 ```
+
 3、运行部署脚本完成ceph的一键部署:
 ```
 python fabfile.py
+```
+如果在部署结束之后，打印出下面的字样说明部署成功: 
+```
+cluster deployed SUCCESSFULLY
+```
+如果在部署结束之后，打印出下面的字样说明部署失败了，需要具体查看失败原因: 
+```
+some osds is FAILED, please double check your configuration
 ```
 
 4、通过集群本脚本扩容一个磁盘:  
