@@ -7,6 +7,7 @@
 - chronyservers: chrony服务器的ip地址;
 - disks: 配置每台服务器的ssd和hdd盘符名称, ceph-deploy会使用ssd来存储wal和rocksdb;  
 - databasesize: 每个osd的rocksdb大小, 单位是GiB.  
+- shouldinstallpromethues: 是否要在服务器上安装监控组件
 典型的配置示例如下：
 ```
 {
@@ -37,7 +38,8 @@
         "ssds": ["/dev/vdb", "/dev/vdc"],
         "hdds": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
     }
-    }
+    },
+    "shouldinstallpromethues": true
 }
 ```
 3、运行部署脚本完成ceph的一键部署:
