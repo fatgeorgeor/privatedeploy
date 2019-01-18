@@ -28,6 +28,10 @@ SSHPRIFILE = SSHDIR + '/id_rsa'
 SSHPUBFILE = SSHDIR + '/id_rsa.pub'
 AUTHORIZEDKEYFILE = SSHDIR + '/authorized_keys'
 DEPLOYDIR = '/opt/cephdeploy'
+ORIGINALTOTAL = 0
+ORIGINALUP = 0
+ORIGINALIN = 0
+
 
 def loadConfiguration(file):
     with open(file) as json_file:
@@ -94,6 +98,22 @@ def LoadConfig():
     USERDEINEDCONFIG['databasesize'] = config['databasesize']
     USERDEINEDCONFIG['shouldinstallpromethues'] = config['shouldinstallpromethues']
 
+def LoadExpandConfig():
+    config = loadConfiguration('expand.json')
+    user = USERDEINEDCONFIG['user'] = config["user"]
+    password = USERDEINEDCONFIG['password'] = config["password"]
+
+    env.roledefs['monitors'] = config["monitors"]
+    env.roledefs['osds'] = config["newosdnodes"]
+    env.roledefs['allnodes'] = config["newosdnodes"]
+            
+    if len(env.roledefs['monitors']) < 1:
+        print "please provide at lease one monitor"
+        exit(-1)
+
+    USERDEINEDCONFIG['disks'] = config["disks"]
+    USERDEINEDCONFIG['chronyservers'] = config["chronyservers"]
+    USERDEINEDCONFIG['databasesize'] = config['databasesize']
 
 moniphostnamedict = {}
 
@@ -179,10 +199,14 @@ def DeployOsds():
             execute(osd_deployosds)
 # -------- functions deploy osds end ------------------------------#
 @parallel
-@roles('allnodes')
+@roles('osds')
 def all_copykeyring():
     # note put/append can add use_sudo=True to pass permission issue.
     put("./ceph.client.admin.keyring", "/etc/ceph/", use_sudo=True)
+
+@parallel
+@roles('allnodes')
+def all_copyconf():
     put("./ceph.conf", "/etc/ceph/", use_sudo=True)
 
 @parallel
@@ -220,6 +244,7 @@ def CreateMonMgr():
             execute(local_createmonitorsandmgrs, mons=USERDEINEDCONFIG['monitorhostnames'])
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
         	execute(all_copykeyring)
+        	execute(all_copyconf)
 
 @parallel
 @roles('allnodes')
@@ -283,25 +308,54 @@ def SetChronyServers():
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             execute(setChrony)
 
-def getosdcountandstat():
+def getosdcount():
     s = json.loads(run('ceph osd stat -f json-pretty'))
 
-    totalosds = 0
+    return s["num_osds"], s["num_up_osds"], s["num_in_osds"]
+
+def getdeployresult():
+    totalosd, uposd, inosd = getosdcount()
+    totaladdedosds = 0
     for _, disks in USERDEINEDCONFIG['disks'].items():
         hdds = disks['hdds']
-        totalosds += len(hdds)
+        totaladdedosds += len(hdds)
 
-    if s["num_osds"] == s["num_up_osds"] == s["num_in_osds"] == totalosds:
+    if totalosd == uposd == inosd == totaladdedosds:
         print ('\33[102m' +  "cluster deployed SUCCESSFULLY" + '\033[0m')
+    else:
+        print ('\033[91m' + "some osds is FAILED, please double check your configuration" + '\033[0m')
+
+def getexpandresult():
+    totalosd, uposd, inosd = getosdcount()
+    totaladdedosds = 0
+    for _, disks in USERDEINEDCONFIG['disks'].items():
+        hdds = disks['hdds']
+        totaladdedosds += len(hdds)
+
+    if totalosd-ORIGINALTOTAL == uposd-ORIGINALIN == inosd-ORIGINALUP == totaladdedosds:
+        print ('\33[102m' +  "cluster expanded SUCCESSFULLY" + '\033[0m')
     else:
         print ('\033[91m' + "some osds is FAILED, please double check your configuration" + '\033[0m')
 
 def CheckOsdCount():
     print "waiting for deploy results............"
     time.sleep(10)
-    LoadConfig()
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-        execute(getosdcountandstat, host=env.roledefs['monitors'][0])
+        execute(getdeployresult, host=env.roledefs['monitors'][0])
+
+def expandgetosdcount():
+    global ORIGINALTOTAL, ORIGINALUP, ORIGINALIN
+    ORIGINALTOTAL, ORIGINALUP, ORIGINALIN = getosdcount()
+
+def CheckOsdCountBeforeExpand():
+    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+        execute(expandgetosdcount, host=env.roledefs['monitors'][0])
+
+def CheckExpandResult():
+    print "waiting for expand results............"
+    time.sleep(10)
+    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+        execute(getexpandresult, host=env.roledefs['monitors'][0])
 
 @parallel
 @roles('allnodes')
@@ -347,6 +401,24 @@ def CleanPrometheus():
     with settings(warn_only=True):
         local("systemctl stop prometheus")
         local("rm /var/lib/prometheus/data -rf")
+
+def AddNewHostsToCluster():
+    LoadExpandConfig()
+    local("rm *keyring* -f")
+    local("ceph-deploy gatherkeys " +  env.roledefs['monitors'][0])
+    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+        execute(all_generateauth)
+        execute(all_sshnopassword)
+        with settings(warn_only=True):
+            execute(all_systemconfig)
+        execute(all_copyscripts)
+        with settings(warn_only=True):
+            execute(all_cleancephdatawithmercy)
+        execute(all_copykeyring)
+    CheckOsdCountBeforeExpand()
+    DeployOsds()
+    CheckExpandResult()
+    
 
 if __name__ == "__main__":
     Init()

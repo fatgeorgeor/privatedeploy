@@ -47,11 +47,11 @@
 ```
 python fabfile.py
 ```
-如果在部署结束之后，打印出下面的字样说明部署成功: 
+如果在部署结束之后，打印出下面的绿色字样说明部署成功: 
 ```
 cluster deployed SUCCESSFULLY
 ```
-如果在部署结束之后，打印出下面的字样说明部署失败了，需要具体查看失败原因: 
+如果在部署结束之后，打印出下面的红色字样说明部署失败了，需要具体查看失败原因: 
 ```
 some osds is FAILED, please double check your configuration
 ```
@@ -71,10 +71,57 @@ ssd是存储rocksdb的wal和db的位置，hdd是存储osd数据的磁盘，datab
 比如在一个典型应用场景中，有两块896G的ssd和6块6T的HDD，那么每三个hdd需要共享一个ssd，首先，三个hdd需要占用3个10GB来存储  
 wal，剩下的ssd空间就是866GB, 存在rocksdb的db的空间就是866/3=288，也就是说databasesize应配置为288.
 
-
-
-
-
-
-
-
+6、批量扩容服务器:
+编辑expand.json,重点配置项如下:
+- monitors: 一个数组，被扩容集群的monitor列表;
+- newosdnodes: 一个数组，需要扩容的服务器列表;
+- user: 进行部署的用户, 一般填root即可;
+- password: user用户的密码;
+- chronyservers: chrony服务器的ip地址;
+- disks: 配置每台服务器的ssd和hdd盘符名称, ceph-deploy会使用ssd来存储wal和rocksdb;  
+- databasesize: 每个osd的rocksdb大小, 单位是GiB, 计算方式跟新部署一致。 
+典型配置如下:  
+```
+{
+    "monitors": [
+        "172.20.13.171",
+        "172.20.13.172",
+        "172.20.13.173"
+    ],
+    "newosdnodes": [
+        "172.20.13.168",
+        "172.20.13.169",
+        "172.20.13.170"
+    ],
+    "user": "root",
+    "password": "1qaz@WSX",
+    "chronyservers": ["51.75.17.219", "202.108.6.95"],
+    "databasesize": 40,
+    "disks": {
+        "172.20.13.168": {
+		"ssds": ["/dev/vda", "/dev/vdc"],
+		"hdds": ["/dev/vdb", "/dev/vdd"]
+	    },
+        "172.20.13.169": {
+		"ssds": ["/dev/vda"],
+		"hdds": ["/dev/vdb"]
+	    },
+        "172.20.13.170": {
+		"ssds": ["/dev/vda"],
+		"hdds": ["/dev/vdb"]
+	    }
+    }
+}
+```
+扩容方式为运行一下命令:
+```
+fab AddNewHostsToCluster
+```
+如果在扩容结束之后，打印出下面的绿色字样说明部署成功: 
+```
+cluster expanded SUCCESSFULLY
+```
+如果在部署结束之后，打印出下面的红色字样说明部署失败了，需要具体查看失败原因: 
+```
+some osds is FAILED, please double check your configuration
+```
