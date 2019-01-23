@@ -404,6 +404,7 @@ def CleanPrometheus():
 
 def AddNewHostsToCluster():
     LoadExpandConfig()
+    SetChronyServers()
     local("rm *keyring* -f")
     local("ceph-deploy gatherkeys " +  env.roledefs['monitors'][0])
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
