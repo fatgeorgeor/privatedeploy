@@ -382,7 +382,6 @@ def DeployPrometheus():
     local("systemctl daemon-reload")
     local("systemctl enable ceph_exporter")
     local("systemctl enable prometheus")
-    local("systemctl enable grafana-server")
     local("echo '  - job_name: \"ceph\"' >> /etc/prometheus/prometheus.yml")
     local("echo '    static_configs: ' >> /etc/prometheus/prometheus.yml")
     local("echo '    - targets: [\'localhost:9128\']' >> /etc/prometheus/prometheus.yml")
@@ -390,7 +389,6 @@ def DeployPrometheus():
 
     local("systemctl restart ceph_exporter")
     local("systemctl restart prometheus")
-    local("systemctl restart grafana-server")
 
     for i in env.roledefs["allnodes"]:
         local("echo '  - job_name: \"%s\"' >> /etc/prometheus/prometheus.yml" % i)
