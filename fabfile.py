@@ -293,14 +293,14 @@ def AddNewDisk(hostname, ssd, hdd, databasesize):
 @parallel
 @roles('allnodes')
 def setChrony():
-    #chrony is not supposed to be install in this iso, will add soon
-    sudo('yum install chrony -y')
+    #chrony is supposed to be install in this iso
+    #sudo('yum install chrony -y')
     sudo('sed -i "/server /d" /etc/chrony.conf')
 
     for ip in USERDEINEDCONFIG['chronyservers']:
         append('/etc/chrony.conf', 'server %s iburst' % ip, use_sudo=True)
 
-    sudo('systemctl daemon-reload')
+    sudo('systemctl enable chronyd')
     sudo('systemctl restart chronyd')
 
 def SetChronyServers():
@@ -359,29 +359,21 @@ def CheckExpandResult():
 
 @parallel
 @roles('allnodes')
-def all_installnodeexporter():
-    #chrony is not supposed to be install in this iso, will add soon
-    put('resources/node_exporter-0.17.0-1.el7.centos.x86_64.rpm', '/tmp', use_sudo=True)
-    sudo("yum localinstall /tmp/node_exporter-0.17.0-1.el7.centos.x86_64.rpm -y")
-    sudo('systemctl daemon-reload')
+def all_enablemonitoringservices():
     sudo('systemctl enable node_exporter')
     sudo('systemctl restart node_exporter')
+    sudo('systemctl enable ceph_exporter')
+    sudo('systemctl restart ceph_exporter')
+    sudo('systemctl enable prometheus')
+    sudo('systemctl restart prometheus')
 
 
 def DeployPrometheus():
     LoadConfig()
     with settings(warn_only=True):
-        local("yum localinstall resources/*.rpm -y")
-        local("cp resources/prometheus.yml /etc/prometheus/")
-        local("cp resources/ceph_exporter /usr/bin/")
-        local("cp resources/ceph_exporter.service /etc/systemd/system/ceph_exporter.service")
-    with settings(warn_only=True):
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            execute(all_installnodeexporter)
+            execute(all_enablemonitoringservices)
 
-    local("systemctl daemon-reload")
-    local("systemctl enable ceph_exporter")
-    local("systemctl enable prometheus")
     local("echo '  - job_name: \"ceph\"' >> /etc/prometheus/prometheus.yml")
     local("echo '    static_configs: ' >> /etc/prometheus/prometheus.yml")
     local("echo '    - targets: [\'localhost:9128\']' >> /etc/prometheus/prometheus.yml")
