@@ -1,4 +1,4 @@
-1、安装ceph-common ceph-osd ceph-mon fabric ceph-deploy等包;  
+1、安装ceph-common ceph-osd ceph-mon fabric ceph-deploy等包, 并给各台服务器配置各不相同的hostname;  
 2、配置config.json，包含的字段包括:
 - monitors: 一个数组，集群需要安装的monitor列表;
 - osdnodes: 一个数组，集群需要安装的osd服务器列表;
