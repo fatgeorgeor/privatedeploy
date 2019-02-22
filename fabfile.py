@@ -389,6 +389,7 @@ def DeployPrometheus():
 
 def CleanPrometheus():
     with settings(warn_only=True):
+        local("cp resources/prometheus.yml /etc/prometheus/")
         local("systemctl stop prometheus")
         local("rm /var/lib/prometheus/data -rf")
 
