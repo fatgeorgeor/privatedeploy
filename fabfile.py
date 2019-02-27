@@ -46,7 +46,6 @@ def read_key_file(key_file):
 def all_systemconfig():
     sudo('systemctl stop firewalld')
     sudo('systemctl disable firewalld')
-    sudo('systemctl disable nfs')
     sudo('setenforce 0')
     sudo("sed -i -e s/SELINUX=enforcing/SELINUX=disabled/g /etc/selinux/config")
 
