@@ -220,7 +220,7 @@ ceph-deploy gatherkeys $monips
 ceph-deploy osd create --block-db /dev/vdc3 --block-wal /dev/vdc4 --data /dev/vde ceph171
 ```
 
-七、通过ceph -s查看是否新增了一个osd，如果成功则需要等待所有pg都是active+clean状态，此次换盘才算完成。 
+七、通过ceph -s查看是否新增了一个osd，如果成功则需要等待所有pg都是active状态:  
 八、所以pg都是active之后，且osd都添加完成之后，重启数据迁移:
 ```
 ceph osd unset norecover
