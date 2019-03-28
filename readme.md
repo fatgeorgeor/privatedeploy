@@ -58,10 +58,20 @@ some osds is FAILED, please double check your configuration
 
 4、通过集群本脚本扩容一个磁盘:  
 ```
-fab AddNewDisk:hostname=ceph168,ssd=/dev/vdb,hdd=/dev/vdd,databasesize=10
+fab AddNewDisk:hostname=ceph174,ssd=/dev/vdb,hdd=/dev/vda,databasesize=50,isfirstrun=True,user=root,password=test
 ```
 在上面的命令行中，AddNewDisk是扩容时执行的函数，hostname是扩容磁盘所在的机器的hostname(或者是IP),   
-ssd是存储rocksdb的wal和db的位置，hdd是存储osd数据的磁盘，databasesize是rocksdb的db的大小。  
+ssd是存储rocksdb的wal和db的位置，hdd是存储osd数据的磁盘，databasesize是rocksdb的db的大小, isfirstrun代表是否是本服务器的第一次扩容，因为第一次扩容时会对该服务器进行初始化,  
+user是服务器的用户名, password是服务器的密码
+
+如果在结束之后，打印出下面的绿色字样说明部署成功: 
+```
+cluster deployed SUCCESSFULLY
+```
+如果在部署结束之后，打印出下面的红色字样说明部署失败了，需要具体查看失败原因: 
+```
+some osds is FAILED, please double check your configuration
+```
 
 5、关于databasesize的计算准则
 为了提升ceph的性能，我们使用ssd来存储bluestore的rocksdb的db和wal，用hdd来存储osd的数据。因为ssd有限，所以我们  

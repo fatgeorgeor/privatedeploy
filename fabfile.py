@@ -198,7 +198,7 @@ def DeployOsds():
             execute(osd_deployosds)
 # -------- functions deploy osds end ------------------------------#
 @parallel
-@roles('osds')
+@roles('allnodes')
 def all_copykeyring():
     # note put/append can add use_sudo=True to pass permission issue.
     put("./ceph.client.admin.keyring", "/etc/ceph/", use_sudo=True)
@@ -282,12 +282,40 @@ def addOneOsd(ssd, hdd, databasesize):
     run('ceph-deploy --overwrite-conf osd create --block-db %s%d --block-wal %s%d --data %s %s' % (ssd, dbpartnum, ssd, walnum, hdd, env.host))
     
 
-def AddNewDisk(hostname, ssd, hdd, databasesize):
-    LoadConfig()
+@roles('allnodes')
+def cleardiskwhenfirstrun(disks):
+    for disk in disks:
+        run('wipefs -a %s' % disk)
+
+# should run with a correct config.json, so we go to DEPLOYDIR
+def AddNewDisk(hostname, isfirstrun, ssd, hdd, databasesize, user, password):
+    with cd(DEPLOYDIR):
+        LoadConfig()
+        CheckOsdCountBeforeExpand()
+
+    env.roledefs['allnodes'] = []
+    env.roledefs['allnodes'].append(hostname)
+    disks = []
+    disks.append(ssd)
+    disks.append(hdd)
+    
+    if isfirstrun:
+        with settings(user=user, password=password):
+            with settings(warn_only=True):
+                execute(setChrony)
+                execute(all_generateauth)
+                execute(all_sshnopassword)
+                execute(all_systemconfig)
+                execute(all_copyscripts)
+                execute(all_cleancephdatawithmercy)
+                execute(all_copykeyring)
+                execute(cleardiskwhenfirstrun, disks=disks)
+
     with settings(warn_only=True):
-        with cd(DEPLOYDIR):
-            with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-                execute(addOneOsd, ssd=ssd, hdd=hdd, databasesize=databasesize, host=hostname)
+            with settings(user=user, password=password):
+                with cd(DEPLOYDIR):
+                    execute(addOneOsd, ssd=ssd, hdd=hdd, databasesize=databasesize, host=hostname)
+    CheckExpandResult(True)
     
 @parallel
 @roles('allnodes')
@@ -324,12 +352,15 @@ def getdeployresult():
     else:
         print ('\033[91m' + "some osds is FAILED, please double check your configuration" + '\033[0m')
 
-def getexpandresult():
+def getexpandresult(onlyone):
     totalosd, uposd, inosd = getosdcount()
     totaladdedosds = 0
-    for _, disks in USERDEINEDCONFIG['disks'].items():
-        hdds = disks['hdds']
-        totaladdedosds += len(hdds)
+    if onlyone:
+        totaladdedosds = 1
+    else:
+        for _, disks in USERDEINEDCONFIG['disks'].items():
+            hdds = disks['hdds']
+            totaladdedosds += len(hdds)
 
     if totalosd-ORIGINALTOTAL == uposd-ORIGINALIN == inosd-ORIGINALUP == totaladdedosds:
         print ('\33[102m' +  "cluster expanded SUCCESSFULLY" + '\033[0m')
@@ -350,11 +381,11 @@ def CheckOsdCountBeforeExpand():
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
         execute(expandgetosdcount, host=env.roledefs['monitors'][0])
 
-def CheckExpandResult():
+def CheckExpandResult(onlyone):
     print "waiting for expand results............"
     time.sleep(10)
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-        execute(getexpandresult, host=env.roledefs['monitors'][0])
+        execute(getexpandresult, onlyone=onlyone, host=env.roledefs['monitors'][0])
 
 @parallel
 @roles('allnodes')
@@ -408,7 +439,7 @@ def AddNewHostsToCluster():
         execute(all_copykeyring)
     CheckOsdCountBeforeExpand()
     DeployOsds()
-    CheckExpandResult()
+    CheckExpandResult(False)
     
 
 if __name__ == "__main__":
