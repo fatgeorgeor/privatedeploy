@@ -325,6 +325,8 @@ def all_enablemonitoringservices():
     sudo('systemctl restart ceph_exporter')
     sudo('systemctl enable prometheus')
     sudo('systemctl restart prometheus')
+    sudo('systemctl enable grafana-server')
+    sudo('systemctl restart grafana-server')
 
 
 def DeployPrometheus():
