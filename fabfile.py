@@ -295,6 +295,8 @@ def AddNewDisk(hostname, isfirstrun, ssd, hdd, databasesize, user, password):
 
     env.roledefs['allnodes'] = []
     env.roledefs['allnodes'].append(hostname)
+    env.roledefs['osds'] = []
+    env.roledefs['osds'].append(hostname)
     disks = []
     disks.append(ssd)
     disks.append(hdd)
@@ -310,6 +312,8 @@ def AddNewDisk(hostname, isfirstrun, ssd, hdd, databasesize, user, password):
                 execute(all_cleancephdatawithmercy)
                 execute(all_copykeyring)
                 execute(cleardiskwhenfirstrun, disks=disks)
+                execute(osds_makedeploydir)
+                execute(osds_copydeployfiles)
 
     with settings(warn_only=True):
             with settings(user=user, password=password):
@@ -395,6 +399,8 @@ def all_enablemonitoringservices():
     sudo('systemctl enable ceph_exporter')
     sudo('systemctl restart ceph_exporter')
     sudo('systemctl enable prometheus')
+    sudo('systemctl enable grafana-server')
+    sudo('systemctl restart grafana-server')
     sudo('systemctl restart prometheus')
 
 
