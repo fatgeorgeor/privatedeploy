@@ -136,3 +136,170 @@ cluster expanded SUCCESSFULLY
 ```
 some osds is FAILED, please double check your configuration
 ```
+
+7、磁盘替换的方法
+当系统中的一块磁盘坏掉之后，我们要执行磁盘磁盘替换流程, 当坏掉一个hdd之后，受其影响，对应的osd将不能启动，当坏掉一个ssd之后，将可能导致多个ssd不能启动。  
+接下来，根据坏盘是hdd还是ssd，有不同的处理方法:  
+7、1 如果坏的是hdd:  
+零、关闭数据迁移：  
+```
+ceph osd set norecover
+ceph osd set nobackfill
+```
+一、在进行磁盘替换之前，应该首先确保ceph集群中所有的pg都是active状态。  
+二、首先进入这个磁盘所在的服务器，得到这个磁盘对应的osd所匹配的ssd和hdd的编号:  
+比如如下的典型场景中:
+```
+[root@ceph171 ceph-5]# ls -al
+total 48
+drwxrwxrwt  2 ceph ceph 340 Mar 28 18:51 .
+drwxr-x---. 4 ceph ceph  32 Mar 28 18:51 ..
+-rw-r--r--  1 ceph ceph 411 Mar 28 18:51 activate.monmap
+lrwxrwxrwx  1 ceph ceph  93 Mar 28 18:51 block -> /dev/ceph-b4a80454-d5ea-440e-80a2-489b375c10e5/osd-block-1b416e79-3ef6-437e-a5d8-c3d95cc301d1
+lrwxrwxrwx  1 ceph ceph   9 Mar 28 18:51 block.db -> /dev/vdc3
+lrwxrwxrwx  1 ceph ceph   9 Mar 28 18:51 block.wal -> /dev/vdc4
+-rw-r--r--  1 ceph ceph   2 Mar 28 18:51 bluefs
+-rw-r--r--  1 ceph ceph  37 Mar 28 18:51 ceph_fsid
+-rw-r--r--  1 ceph ceph  37 Mar 28 18:51 fsid
+-rw-------  1 ceph ceph  55 Mar 28 18:51 keyring
+-rw-r--r--  1 ceph ceph   8 Mar 28 18:51 kv_backend
+-rw-r--r--  1 ceph ceph  21 Mar 28 18:51 magic
+-rw-r--r--  1 ceph ceph   4 Mar 28 18:51 mkfs_done
+-rw-r--r--  1 ceph ceph  41 Mar 28 18:51 osd_key
+-rw-r--r--  1 ceph ceph   6 Mar 28 18:51 ready
+-rw-r--r--  1 ceph ceph  10 Mar 28 18:51 type
+-rw-r--r--  1 ceph ceph   2 Mar 28 18:51 whoami
+```
+通过上面的ls -al命令可以看出/dev/vdc为这个osd对应的ssd(看block.db和block.wal这两个软链接指向的磁盘);  
+再看lsblk的输出:  
+```
+[root@ceph171 ceph-5]# lsblk
+NAME                                                                                                  MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                                                                                                     8:0    0  100G  0 disk
+├─sda1                                                                                                  8:1    0  500M  0 part /boot
+└─sda2                                                                                                  8:2    0 99.5G  0 part
+  ├─centos-root                                                                                       253:0    0   50G  0 lvm  /
+  ├─centos-swap                                                                                       253:1    0  3.9G  0 lvm  [SWAP]
+  └─centos-home                                                                                       253:2    0 45.6G  0 lvm  /home
+vda                                                                                                   252:0    0  100G  0 disk
+├─vda1                                                                                                252:1    0   40G  0 part
+└─vda2                                                                                                252:2    0   10G  0 part
+vdb                                                                                                   252:16   0  100G  0 disk
+└─ceph--b4a80454--d5ea--440e--80a2--489b375c10e5-osd--block--1b416e79--3ef6--437e--a5d8--c3d95cc301d1 253:4    0  100G  0 lvm
+vdc                                                                                                   252:32   0  100G  0 disk
+├─vdc1                                                                                                252:33   0   20G  0 part
+├─vdc2                                                                                                252:34   0   10G  0 part
+├─vdc3                                                                                                252:35   0   20G  0 part
+└─vdc4                                                                                                252:36   0   10G  0 part
+vdd                                                                                                   252:48   0  100G  0 disk
+└─ceph--584dd760--e50d--45b9--af29--47a145e06075-osd--block--30211c4b--7ee8--4dca--8ca1--06dc54fd5eef 253:3    0  100G  0 lvm
+```
+而对应的hdd则可以通过lsblk看出这个osd对应的磁盘是/dev/vdb, 方法是ceph-5的block指向的设备有osd-block-1b416e79-3ef6-437e-a5d8-c3d95cc301d1, 而vdb也有.  
+
+三、进入这个磁盘所在的服务器，并对这个osd的目录进行umount操作:
+```
+umount /var/lib/ceph/osd/ceph-5
+```
+然后将此osd进行purge操作:
+```
+ceph osd purge 5 --yes-i-really-mean-it
+```
+
+四、插入新盘，得到其盘符假设为vde;  
+五、清除掉ssd(此处为vdc)的block.db和block.wal上的元数据(这些元数据一般位于128M以内):  
+```
+dd if=/dev/zero of=/dev/vdc3 bs=128M count=1
+dd if=/dev/zero of=/dev/vdc4 bs=128M count=1
+```
+六、在这个磁盘上添加一个新的osd:
+```
+#得到monitor的ip地址, 即$moips
+ceph-deploy gatherkeys $monips
+#在这里block-db使用的是vdc的第三个分区, block-wal使用的是vdc的第四个分区, 数据则存储在/dev/vde。
+#data是数据盘，存储在新插入的/dev/vde上，ceph171则是此次坏盘的服务器。
+ceph-deploy osd create --block-db /dev/vdc3 --block-wal /dev/vdc4 --data /dev/vde ceph171
+```
+
+七、通过ceph -s查看是否新增了一个osd，如果成功则需要等待所有pg都是active+clean状态，此次换盘才算完成。 
+八、所以pg都是active之后，且osd都添加完成之后，重启数据迁移:
+```
+ceph osd unset norecover
+ceph osd unset nobackfill
+```
+
+7.2 如果坏的是sdd:  
+坏一个ssd一般会造成多个osd损坏，因为ssd上存放了多个osd的元数据.    
+```
+[root@ceph171 ceph-5]# lsblk
+NAME                                                                                                  MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                                                                                                     8:0    0  100G  0 disk
+├─sda1                                                                                                  8:1    0  500M  0 part /boot
+└─sda2                                                                                                  8:2    0 99.5G  0 part
+  ├─centos-root                                                                                       253:0    0   50G  0 lvm  /
+  ├─centos-swap                                                                                       253:1    0  3.9G  0 lvm  [SWAP]
+  └─centos-home                                                                                       253:2    0 45.6G  0 lvm  /home
+vda                                                                                                   252:0    0  100G  0 disk
+├─vda1                                                                                                252:1    0   40G  0 part
+└─vda2                                                                                                252:2    0   10G  0 part
+vdb                                                                                                   252:16   0  100G  0 disk
+└─ceph--b4a80454--d5ea--440e--80a2--489b375c10e5-osd--block--1b416e79--3ef6--437e--a5d8--c3d95cc301d1 253:4    0  100G  0 lvm
+vdc                                                                                                   252:32   0  100G  0 disk
+├─vdc1                                                                                                252:33   0   20G  0 part
+├─vdc2                                                                                                252:34   0   10G  0 part
+├─vdc3                                                                                                252:35   0   20G  0 part
+└─vdc4                                                                                                252:36   0   10G  0 part
+vdd                                                                                                   252:48   0  100G  0 disk
+└─ceph--584dd760--e50d--45b9--af29--47a145e06075-osd--block--30211c4b--7ee8--4dca--8ca1--06dc54fd5eef 253:3    0  100G  0 lvm
+```
+在上面这个环境里，vdc存储了两个osd的元数据，因此vdc损坏将造成vdb和vdd两个osd的数据全部丢失, 下面是处理方式:
+零、关闭数据迁移：
+```
+ceph osd set norecover
+ceph osd set nobackfill
+```
+一、在进行磁盘替换之前，应该首先确保ceph集群中所有的pg都是active状态。 
+二、进入这个磁盘所在的服务器，并对这个osd的目录进行umount操作:
+```
+umount /var/lib/ceph/osd/ceph-2
+umount /var/lib/ceph/osd/ceph-5
+```
+三、跟上面的方式类似，并全部purge掉两个osd。  
+```
+ceph osd purge 2 --yes-i-really-mean-it
+ceph osd purge 5 --yes-i-really-mean-it
+```
+四、插入新盘，得到其盘符假设为vde;  
+五、在vde上创建符合大小要求的分区供各个osd使用, 这里我们创建4个，大小分别是20G,10G,20G,10G，跟一开始的大小一致:  
+```
+sgdisk -n 0:0:+20G /dev/vde
+sgdisk -n 0:0:+10G /dev/vde
+sgdisk -n 0:0:+20G /dev/vde
+sgdisk -n 0:0:+10G /dev/vde
+```
+六、在vdb上添加一个新的osd:  
+```
+#以下操作在tmp目录进行
+cd /tmp
+#得到monitor的ip地址, 即$moips
+ceph-deploy gatherkeys $monips
+#在这里block-db使用的是vde的第一个分区, block-wal使用的是vdc的第二个分区, 数据则存储在/dev/vde。
+#data是数据盘，存储在新插入的/dev/vdb上，ceph171则是此次坏盘的服务器。
+ceph-deploy osd create --block-db /dev/vde1 --block-wal /dev/vde2 --data /dev/vdb ceph171
+```
+
+七、通过ceph -s查看是否新增了一个osd，如果成功则需要等待所有pg都是active.  
+八、在vdd上添加一个新的osd:  
+```
+#以下操作在tmp目录进行
+cd /tmp
+#在这里block-db使用的是vde的第三个分区, block-wal使用的是vdc的第四个分区, 数据则存储在/dev/vde。
+#data是数据盘，存储在新插入的/dev/vdb上，ceph171则是此次坏盘的服务器。
+ceph-deploy osd create --block-db /dev/vde3 --block-wal /dev/vde4 --data /dev/vdd ceph171
+```
+九、通过ceph -s查看是否新增了一个osd，如果成功则需要等待所有pg都是active.  
+十、所以pg都是active之后，且osd都添加完成之后，重启数据迁移:   
+```
+ceph osd unset norecover
+ceph osd unset nobackfill
+```
+
