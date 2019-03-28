@@ -94,7 +94,6 @@ def LoadConfig():
     USERDEINEDCONFIG['disks'] = config["disks"]
     USERDEINEDCONFIG['chronyservers'] = config["chronyservers"]
     USERDEINEDCONFIG['monitorhostnames'] = ''
-    USERDEINEDCONFIG['databasesize'] = config['databasesize']
     USERDEINEDCONFIG['shouldinstallpromethues'] = config['shouldinstallpromethues']
 
 def LoadExpandConfig():
@@ -112,7 +111,6 @@ def LoadExpandConfig():
 
     USERDEINEDCONFIG['disks'] = config["disks"]
     USERDEINEDCONFIG['chronyservers'] = config["chronyservers"]
-    USERDEINEDCONFIG['databasesize'] = config['databasesize']
 
 moniphostnamedict = {}
 
@@ -150,34 +148,15 @@ def osd_deployosds():
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             for host, disks in USERDEINEDCONFIG['disks'].items():
                 if env.host == host:
-                    ssds = disks['ssds']
                     hdds = disks['hdds']
-                    ssdnum = len(ssds)
                     hddnum = len(hdds)
 
-                    if ssdnum < 1 or hddnum < 1:
-                        print "please provide at lease one ssd/hdd for host %s" % host
+                    if hddnum < 1:
+                        print "please provide at lease one hdd for host %s" % host
                         exit(-1)
-
-                    partitionmap = {}
-                    # clear patitions of every ssd
-                    for i in ssds + hdds:
-                        sudo('sgdisk -o %s' % i)
-                        sudo('partprobe %s' % i)
-
-                    for i in ssds:
-                        partitionmap[i] = 1
-                    for index, hdd in enumerate(hdds):
-                        sudo('dd if=/dev/zero of=%s bs=128M count=1' % hdd)
-                        ssd = ssds[index % ssdnum]
-                        sudo('sgdisk -n 0:0:+%dG %s' % (USERDEINEDCONFIG['databasesize'], ssd))
-                        sudo('sgdisk -n 0:0:+10G %s' % (ssd))
-                        sudo('partprobe %s' % (ssd))
-                        partitionmap[ssd] += 2
-                        dbpath = ssd + "%s" % (partitionmap[ssd]-2)
-                        walpath = ssd + "%s" % (partitionmap[ssd]-1)
-                        run('ceph-deploy --overwrite-conf osd create --block-db %s --block-wal %s --data %s %s' % (dbpath, walpath, hdd, host))
-                    break
+                    for hdd in hdds:
+                        run('dd if=/dev/zero of=%s bs=4M count=1' % (hdd))
+                        run('ceph-deploy --overwrite-conf osd create --data %s %s' % (hdd, host))
 @parallel
 @roles('osds')
 def osds_makedeploydir():
@@ -252,42 +231,20 @@ def stopcephservice():
     sudo("systemctl stop ceph-mgr.target")
     sudo("systemctl stop ceph-mon.target")
 
-def addOneOsd(ssd, hdd, databasesize):
-    s = sudo("blkid | grep %s | awk -F':' '{print $1}' | awk -F'%s' '{print $2}'" %(ssd, ssd))
-    partset = set()
-    for i in s:
-        if i != '\r' and i != '\n':
-            partset.add(i)
-
-    sudo('sgdisk -n 0:0:+%sG %s' % (databasesize, ssd))
-    sudo('partprobe %s' % (ssd))
-
-    s = sudo("blkid | grep %s | awk -F':' '{print $1}' | awk -F'%s' '{print $2}'" %(ssd, ssd))
-    partset_afterdb = set()
-    for i in s:
-        if i != '\r' and i != '\n':
-            partset_afterdb.add(i)
-    dbpartnum = int((partset_afterdb - partset).pop())
-
-    sudo('sgdisk -n 0:0:+10G %s' % (ssd))
-    sudo('partprobe %s' % (ssd))
-    s = sudo("blkid | grep %s | awk -F':' '{print $1}' | awk -F'%s' '{print $2}'" %(ssd, ssd))
-    partset_afterwal = set()
-    for i in s:
-        if i != '\r' and i != '\n':
-            partset_afterwal.add(i)
-
-    walnum = int((partset_afterwal - partset_afterdb).pop())
-
-    run('ceph-deploy --overwrite-conf osd create --block-db %s%d --block-wal %s%d --data %s %s' % (ssd, dbpartnum, ssd, walnum, hdd, env.host))
+def addOneOsd(hdd):
+    run('dd if=/dev/zero of=%s bs=4M count=1' % (hdd))
+    run('ceph-deploy --overwrite-conf osd create --data %s %s' % (hdd, env.host))
     
 
-def AddNewDisk(hostname, ssd, hdd, databasesize):
+def AddNewDisk(hostname, hdd):
     LoadConfig()
+    CheckOsdCountBeforeExpand()
     with settings(warn_only=True):
         with cd(DEPLOYDIR):
             with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-                execute(addOneOsd, ssd=ssd, hdd=hdd, databasesize=databasesize, host=hostname)
+                execute(addOneOsd, hdd=hdd, host=hostname)
+    time.sleep(10)
+    CheckExpandResult(True)
     
 @parallel
 @roles('allnodes')
@@ -324,12 +281,15 @@ def getdeployresult():
     else:
         print ('\033[91m' + "some osds is FAILED, please double check your configuration" + '\033[0m')
 
-def getexpandresult():
+def getexpandresult(onlyone):
     totalosd, uposd, inosd = getosdcount()
     totaladdedosds = 0
-    for _, disks in USERDEINEDCONFIG['disks'].items():
-        hdds = disks['hdds']
-        totaladdedosds += len(hdds)
+    if onlyone:
+        totaladdedosds = 1
+    else:
+        for _, disks in USERDEINEDCONFIG['disks'].items():
+            hdds = disks['hdds']
+            totaladdedosds += len(hdds)
 
     if totalosd-ORIGINALTOTAL == uposd-ORIGINALIN == inosd-ORIGINALUP == totaladdedosds:
         print ('\33[102m' +  "cluster expanded SUCCESSFULLY" + '\033[0m')
@@ -350,11 +310,11 @@ def CheckOsdCountBeforeExpand():
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
         execute(expandgetosdcount, host=env.roledefs['monitors'][0])
 
-def CheckExpandResult():
+def CheckExpandResult(onlyone):
     print "waiting for expand results............"
     time.sleep(10)
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-        execute(getexpandresult, host=env.roledefs['monitors'][0])
+        execute(getexpandresult, onlyone=onlyone, host=env.roledefs['monitors'][0])
 
 @parallel
 @roles('allnodes')
@@ -408,7 +368,7 @@ def AddNewHostsToCluster():
         execute(all_copykeyring)
     CheckOsdCountBeforeExpand()
     DeployOsds()
-    CheckExpandResult()
+    CheckExpandResult(False)
     
 
 if __name__ == "__main__":
