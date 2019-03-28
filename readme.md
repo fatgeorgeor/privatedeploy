@@ -116,3 +116,82 @@ cluster expanded SUCCESSFULLY
 ```
 some osds is FAILED, please double check your configuration
 ```
+
+6、磁盘替换的方法
+当系统中的一块磁盘坏掉之后，我们要执行磁盘磁盘替换流程, 当坏掉一个hdd之后，受其影响，对应的osd将不能启动.
+零、关闭数据迁移：  
+```
+ceph osd set norecover
+ceph osd set nobackfill
+```
+一、在进行磁盘替换之前，应该首先确保ceph集群中所有的pg都是active状态。  
+二、首先进入这个磁盘所在的服务器，得到这个磁盘对应的osd所匹配的hdd的盘符:  
+比如如下的典型场景中:
+```
+[root@ceph171 ceph-9]# ls -al
+total 48
+drwxrwxrwt  2 ceph ceph 300 Mar 28 21:51 .
+drwxr-x---. 6 ceph ceph  58 Mar 28 21:51 ..
+-rw-r--r--  1 ceph ceph 411 Mar 28 21:51 activate.monmap
+lrwxrwxrwx  1 ceph ceph  93 Mar 28 21:51 block -> /dev/ceph-86fdc0a8-2152-4e47-8c92-4ae442a33c10/osd-block-ab2e0b89-3209-462b-8b80-46383f7113c4
+-rw-r--r--  1 ceph ceph   2 Mar 28 21:51 bluefs
+-rw-r--r--  1 ceph ceph  37 Mar 28 21:51 ceph_fsid
+-rw-r--r--  1 ceph ceph  37 Mar 28 21:51 fsid
+-rw-------  1 ceph ceph  55 Mar 28 21:51 keyring
+-rw-r--r--  1 ceph ceph   8 Mar 28 21:51 kv_backend
+-rw-r--r--  1 ceph ceph  21 Mar 28 21:51 magic
+-rw-r--r--  1 ceph ceph   4 Mar 28 21:51 mkfs_done
+-rw-r--r--  1 ceph ceph  41 Mar 28 21:51 osd_key
+-rw-r--r--  1 ceph ceph   6 Mar 28 21:51 ready
+-rw-r--r--  1 ceph ceph  10 Mar 28 21:51 type
+-rw-r--r--  1 ceph ceph   2 Mar 28 21:51 whoami
+```
+再看lsblk的输出:  
+```
+[root@ceph171 ceph-9]# lsblk
+NAME                                                                                                  MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                                                                                                     8:0    0  100G  0 disk
+├─sda1                                                                                                  8:1    0  500M  0 part /boot
+└─sda2                                                                                                  8:2    0 99.5G  0 part
+  ├─centos-root                                                                                       253:0    0   50G  0 lvm  /
+  ├─centos-swap                                                                                       253:1    0  3.9G  0 lvm  [SWAP]
+  └─centos-home                                                                                       253:2    0 45.6G  0 lvm  /home
+vda                                                                                                   252:0    0  100G  0 disk
+└─ceph--c2762328--df0a--4c0a--8259--df1060257c1f-osd--block--2df0cce0--573c--469d--bf4d--65dfa6de2adb 253:5    0  100G  0 lvm
+vdb                                                                                                   252:16   0  100G  0 disk
+└─ceph--6f11a723--fc6e--4ce0--90df--7263f571573c-osd--block--c878c72c--167a--4ccb--9451--eea101b268dd 253:4    0  100G  0 lvm
+vdc                                                                                                   252:32   0  100G  0 disk
+└─ceph--86fdc0a8--2152--4e47--8c92--4ae442a33c10-osd--block--ab2e0b89--3209--462b--8b80--46383f7113c4 253:6    0  100G  0 lvm
+vdd                                                                                                   252:48   0  100G  0 disk
+└─ceph--532714d2--ade7--4519--a74a--26c46abb9d50-osd--block--34743ed1--0ec7--464e--b352--856f279134dd 253:3    0  100G  0 lvm
+```
+而对应的hdd则可以通过lsblk看出这个osd对应的磁盘是/dev/vdc, 方法是ceph-9的block指向的设备有osd-block-ab2e0b89-3209-462b-8b80-46383f7113c4, 而vdc也有.  
+
+三、进入这个磁盘所在的服务器，并对这个osd的目录进行umount操作:
+```
+umount /var/lib/ceph/osd/ceph-9
+```
+然后将此osd进行purge操作:
+```
+ceph osd purge 9 --yes-i-really-mean-it
+```
+
+四、插入新盘，得到其盘符假设为vde;  
+五、清除掉vde上可能存在的数据(这些数据一般位于128M以内):  
+```
+dd if=/dev/zero of=/dev/vde bs=128M count=1
+```
+六、在这个磁盘上添加一个新的osd:
+```
+#得到monitor的ip地址, 即$moips
+ceph-deploy gatherkeys $monips
+#data是数据盘，存储在新插入的/dev/vde上，ceph171则是此次坏盘的服务器。
+ceph-deploy osd create --data /dev/vde ceph171
+```
+
+七、通过ceph -s查看是否新增了一个osd，如果成功则需要等待所有pg都是active状态  
+八、所以pg都是active之后，且osd都添加完成之后，重启数据迁移:
+```
+ceph osd unset norecover
+ceph osd unset nobackfill
+```
