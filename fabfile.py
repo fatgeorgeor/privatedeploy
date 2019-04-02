@@ -372,6 +372,16 @@ def AddNewHostsToCluster():
     DeployOsds()
     CheckExpandResult(False)
     
+def startbalancer():
+    run("ceph mgr module enable balancer")
+    run("ceph config-key set mgr/balancer/max_misplaced .01")
+    run("ceph balancer mode crush-compat")
+    run("ceph balancer on")
+    print("ceph balancer started")
+
+def StartCephBalancer():
+    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+        execute(startbalancer, host=env.roledefs['monitors'][0])
 
 if __name__ == "__main__":
     Init()
@@ -380,6 +390,7 @@ if __name__ == "__main__":
     CreateMonMgr()
     DeployOsds()
     CheckOsdCount()
+    StartCephBalancer()
     if USERDEINEDCONFIG["shouldinstallpromethues"]:
         CleanPrometheus()
         DeployPrometheus()

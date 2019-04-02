@@ -195,3 +195,32 @@ ceph-deploy osd create --data /dev/vde ceph171
 ceph osd unset norecover
 ceph osd unset nobackfill
 ```
+
+7、在创建pool之后，适时关闭ceph balancer
+ceph在luminous版本中引入了mgr的balancer plugin，可以对集群中的pg进行均衡，从而让集群中的每个osd数据量均等，提高
+集群的性能和数据均匀性. 在最新版本的ceph部署脚本中，添加了对ceph balancer的支持，并且在脚本中开启了ceph balancer.   
+在创建完一个pool之后，balancer开始工作，通过调整pool的位置来均衡每个osd上的pg，我们可以通过一下命令查看调整的过程：
+```
+root@ceph103:~# ceph balancer eval
+current cluster score 0.004180 (lower is better)
+```
+当```ceph balancer eval的输出```基本不变时，我们可以通过```ceph osd df```查看每个osd上的pg个数(最后一列):
+```
+root@ceph103:~# ceph osd df
+ID CLASS WEIGHT  REWEIGHT SIZE    USE     AVAIL   %USE VAR  PGS
+ 1   ssd 7.27640  1.00000 7.28TiB 1.00GiB 7.28TiB 0.01 0.05  43
+ 3   ssd 7.27640  1.00000 7.28TiB 1.00GiB 7.28TiB 0.01 0.05  43
+ 0   ssd 7.27640  1.00000 7.28TiB 28.6GiB 7.25TiB 0.38 1.35  43
+ 5   ssd 7.27640  1.00000 7.28TiB 28.5GiB 7.25TiB 0.38 1.35  43
+ 7   ssd 7.27640  1.00000 7.28TiB 27.9GiB 7.25TiB 0.37 1.32  42
+ 2   ssd 7.27640  1.00000 7.28TiB 27.6GiB 7.25TiB 0.37 1.30  43
+ 4   ssd 7.27640  1.00000 7.28TiB 27.6GiB 7.25TiB 0.37 1.31  43
+ 6   ssd 7.27640  1.00000 7.28TiB 27.0GiB 7.25TiB 0.36 1.28  42
+                    TOTAL 58.2TiB  169GiB 58.0TiB 0.28
+MIN/MAX VAR: 0.05/1.35  STDDEV: 0.16
+```
+这说明每个osd上的pg个数已经基本均匀了，根据经验，一般这个自动的数据均衡过程需要五分钟左右。
+在pg均匀了之后，最重要的一步是，我们需要手工关闭balancer，这一步必须要做。
+```
+ceph balancer off
+```
