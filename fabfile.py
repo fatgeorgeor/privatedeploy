@@ -148,7 +148,7 @@ def osd_deployosds():
         with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
             for host, disks in USERDEINEDCONFIG['disks'].items():
                 if env.host == host:
-                    hdds = disks['hdds']
+                    hdds = disks['disks']
                     hddnum = len(hdds)
 
                     if hddnum < 1:
@@ -236,13 +236,13 @@ def addOneOsd(hdd):
     run('ceph-deploy --overwrite-conf osd create --data %s %s' % (hdd, env.host))
     
 
-def AddNewDisk(hostname, hdd):
+def AddNewDisk(hostname, disk):
     LoadConfig()
     CheckOsdCountBeforeExpand()
     with settings(warn_only=True):
         with cd(DEPLOYDIR):
             with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-                execute(addOneOsd, hdd=hdd, host=hostname)
+                execute(addOneOsd, hdd=disk, host=hostname)
     time.sleep(10)
     CheckExpandResult(True)
     
@@ -273,7 +273,7 @@ def getdeployresult():
     totalosd, uposd, inosd = getosdcount()
     totaladdedosds = 0
     for _, disks in USERDEINEDCONFIG['disks'].items():
-        hdds = disks['hdds']
+        hdds = disks['disks']
         totaladdedosds += len(hdds)
 
     if totalosd == uposd == inosd == totaladdedosds:
@@ -288,7 +288,7 @@ def getexpandresult(onlyone):
         totaladdedosds = 1
     else:
         for _, disks in USERDEINEDCONFIG['disks'].items():
-            hdds = disks['hdds']
+            hdds = disks['disks']
             totaladdedosds += len(hdds)
 
     if totalosd-ORIGINALTOTAL == uposd-ORIGINALIN == inosd-ORIGINALUP == totaladdedosds:

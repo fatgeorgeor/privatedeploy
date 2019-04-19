@@ -1,4 +1,4 @@
-0、这个分支维护了纯hdd的部署,这种环境下，没有ssd，所有osd的数据全部存储在hdd上, 部署方式跟有ssd的稍有不同。  
+0、这个分支维护了纯hdd/纯ssd的部署,这种环境下，所有osd的数据全部存储在hdd或者ssd上, 部署方式跟使用ssd存rocksdb的环境稍有不同。  
 1、安装ceph-common ceph-osd ceph-mon fabric ceph-deploy等包, 并给各台服务器配置各不相同的hostname;  
 2、配置config.json，包含的字段包括:
 - monitors: 一个数组，集群需要安装的monitor列表;
@@ -6,7 +6,7 @@
 - user: 进行部署的用户, 一般填root即可;
 - password: user用户的密码;
 - chronyservers: chrony服务器的ip地址;
-- disks: 配置每台服务器的hdd盘符名称
+- disks: 配置每台服务器的盘符名称
 - shouldinstallpromethues: 是否要在服务器上安装监控组件
 典型的配置示例如下：
 ```
@@ -26,13 +26,13 @@
     "chronyservers": "10.70.140.20",
     "disks": {
         "192.168.0.154": {
-        "hdds": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
+        "disks": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
     },
         "192.168.0.155": {
-        "hdds": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
+        "disks": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
     },
         "192.168.0.156": {
-        "hdds": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
+        "disks": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
     }
     },
     "shouldinstallpromethues": true
@@ -54,9 +54,9 @@ some osds is FAILED, please double check your configuration
 
 4、通过集群本脚本扩容一个磁盘:  
 ```
-fab AddNewDisk:hostname=ceph168,hdd=/dev/vdd
+fab AddNewDisk:hostname=ceph168,disk=/dev/vdd
 ```
-在上面的命令行中，AddNewDisk是扩容时执行的函数，hostname是扩容磁盘所在的机器的hostname(或者是IP), hdd是存储osd数据的磁盘.
+在上面的命令行中，AddNewDisk是扩容时执行的函数，hostname是扩容磁盘所在的机器的hostname(或者是IP), disk是存储osd数据的磁盘.
 如果在结束之后，打印出下面的绿色字样说明部署成功: 
 ```
 cluster deployed SUCCESSFULLY
@@ -74,7 +74,7 @@ some osds is FAILED, please double check your configuration
 - user: 进行部署的用户, 一般填root即可;
 - password: user用户的密码;
 - chronyservers: chrony服务器的ip地址;
-- disks: 配置每台服务器的hdd盘符名称 
+- disks: 配置每台服务器的盘符名称 
 典型配置如下:  
 ```
 {
@@ -93,13 +93,13 @@ some osds is FAILED, please double check your configuration
     "chronyservers": ["51.75.17.219", "202.108.6.95"],
     "disks": {
         "172.20.13.168": {
-		"hdds": ["/dev/vdb", "/dev/vdd"]
+		"disks": ["/dev/vdb", "/dev/vdd"]
 	    },
         "172.20.13.169": {
-		"hdds": ["/dev/vdb"]
+		"disks": ["/dev/vdb"]
 	    },
         "172.20.13.170": {
-		"hdds": ["/dev/vdb"]
+		"disks": ["/dev/vdb"]
 	    }
     }
 }
@@ -118,14 +118,14 @@ some osds is FAILED, please double check your configuration
 ```
 
 6、磁盘替换的方法
-当系统中的一块磁盘坏掉之后，我们要执行磁盘磁盘替换流程, 当坏掉一个hdd之后，受其影响，对应的osd将不能启动.
+当系统中的一块磁盘坏掉之后，我们要执行磁盘磁盘替换流程, 当坏掉一个hdd/ssd之后，受其影响，对应的osd将不能启动.
 零、关闭数据迁移：  
 ```
 ceph osd set norecover
 ceph osd set nobackfill
 ```
 一、在进行磁盘替换之前，应该首先确保ceph集群中所有的pg都是active状态。  
-二、首先进入这个磁盘所在的服务器，得到这个磁盘对应的osd所匹配的hdd的盘符:  
+二、首先进入这个磁盘所在的服务器，得到这个磁盘对应的osd所匹配的hdd/ssd的盘符:  
 比如如下的典型场景中:
 ```
 [root@ceph171 ceph-9]# ls -al
@@ -165,7 +165,7 @@ vdc                                                                             
 vdd                                                                                                   252:48   0  100G  0 disk
 └─ceph--532714d2--ade7--4519--a74a--26c46abb9d50-osd--block--34743ed1--0ec7--464e--b352--856f279134dd 253:3    0  100G  0 lvm
 ```
-而对应的hdd则可以通过lsblk看出这个osd对应的磁盘是/dev/vdc, 方法是ceph-9的block指向的设备有osd-block-ab2e0b89-3209-462b-8b80-46383f7113c4, 而vdc也有.  
+而对应的hdd/ssd则可以通过lsblk看出这个osd对应的磁盘是/dev/vdc, 方法是ceph-9的block指向的设备有osd-block-ab2e0b89-3209-462b-8b80-46383f7113c4, 而vdc也有.  
 
 三、进入这个磁盘所在的服务器，并对这个osd的目录进行umount操作:
 ```

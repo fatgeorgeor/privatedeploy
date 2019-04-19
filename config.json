@@ -14,13 +14,13 @@
     "chronyservers": ["51.75.17.219", "202.108.6.95"],
     "disks": {
         "172.20.13.171": {
-		    "hdds": ["/dev/vdd", "/dev/vdb", "/dev/vda", "/dev/vdc"]
+		    "disks": ["/dev/vdd", "/dev/vdb", "/dev/vda", "/dev/vdc"]
 	    },
         "172.20.13.172": {
-		    "hdds": ["/dev/vdd", "/dev/vdb", "/dev/vda", "/dev/vdc"]
+		    "disks": ["/dev/vdd", "/dev/vdb", "/dev/vda", "/dev/vdc"]
 	    },
         "172.20.13.173": {
-		    "hdds": ["/dev/vdd", "/dev/vdb", "/dev/vda"]
+		    "disks": ["/dev/vdd", "/dev/vdb", "/dev/vda"]
 	    }
     },
     "shouldinstallpromethues": true
