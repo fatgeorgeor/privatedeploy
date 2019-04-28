@@ -23,5 +23,6 @@
 		    "disks": ["/dev/vdd", "/dev/vdb", "/dev/vda"]
 	    }
     },
+    "isallflash":true,
     "shouldinstallpromethues": true
 }

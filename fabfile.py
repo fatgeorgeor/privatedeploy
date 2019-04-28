@@ -93,6 +93,7 @@ def LoadConfig():
         exit(-1)
 
     USERDEINEDCONFIG['disks'] = config["disks"]
+    USERDEINEDCONFIG['isallflash'] = config["isallflash"]
     USERDEINEDCONFIG['chronyservers'] = config["chronyservers"]
     USERDEINEDCONFIG['monitorhostnames'] = ''
     USERDEINEDCONFIG['shouldinstallpromethues'] = config['shouldinstallpromethues']
@@ -286,7 +287,11 @@ def getdeployresult():
                 break
 
         local("ceph osd pool create volumes %d" % pow(2, k+1))
-        time.sleep(5)        
+        if USERDEINEDCONFIG["isallflash"]:
+            for i in range(0, totalosd):
+                local("ceph osd crush rm-device-class %d" % i)
+                local("ceph osd crush set-device-class ssd %i" % i)
+
         print ('\33[102m' +  "cluster deployed SUCCESSFULLY" + '\033[0m')
     else:
         print ('\033[91m' + "some osds is FAILED, please double check your configuration" + '\033[0m')
@@ -396,6 +401,16 @@ def StartCephBalancer():
     with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
         execute(startbalancer, host=env.roledefs['monitors'][0])
 
+@parallel
+@roles('osds')
+def restartosds():
+    sudo("systemctl restart ceph-osd.target")
+
+def RestartAllOsds():
+    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+        execute(restartosds)
+    
+
 if __name__ == "__main__":
     Init()
     SetChronyServers()
@@ -404,6 +419,8 @@ if __name__ == "__main__":
     DeployOsds()
     CheckOsdCount()
     StartCephBalancer()
+    if USERDEINEDCONFIG["isallflash"]:
+        RestartAllOsds()    
     if USERDEINEDCONFIG["shouldinstallpromethues"]:
         CleanPrometheus()
         DeployPrometheus()

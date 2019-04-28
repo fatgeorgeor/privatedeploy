@@ -7,6 +7,7 @@
 - password: user用户的密码;
 - chronyservers: chrony服务器的ip地址;
 - disks: 配置每台服务器的盘符名称
+- isallflash: 配置是否是一个全闪集群, 如是则填true
 - shouldinstallpromethues: 是否要在服务器上安装监控组件
 典型的配置示例如下：
 ```
@@ -35,6 +36,7 @@
         "disks": ["/dev/vde", "/dev/vdd", "/dev/vdg", "/dev/vdh", "/dev/vdf"]
     }
     },
+    "isallflash": true,
     "shouldinstallpromethues": true
 }
 ```
