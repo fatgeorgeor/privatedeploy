@@ -53,6 +53,7 @@ def all_systemconfig():
 @roles('allnodes')
 def all_copyscripts():
     put('resources/clearcephlvm.sh', '/tmp/', use_sudo=True)
+    put('resources/stopbalancer.sh', '/tmp/', use_sudo=True)
 
 @parallel
 @roles('allnodes')
@@ -277,6 +278,15 @@ def getdeployresult():
         totaladdedosds += len(hdds)
 
     if totalosd == uposd == inosd == totaladdedosds:
+        n = int((totalosd * 100) / 3.0)
+        # n is at least 33.3, so k should be greater than 5
+        # 18 is because it's unlikely to have a big cluster with so many osds
+        for k in range(5,18):
+            if pow(2,k) < n and pow(2,k+1) >= n:
+                break
+
+        local("ceph osd pool create volumes %d" % pow(2, k+1))
+        time.sleep(5)        
         print ('\33[102m' +  "cluster deployed SUCCESSFULLY" + '\033[0m')
     else:
         print ('\033[91m' + "some osds is FAILED, please double check your configuration" + '\033[0m')
@@ -374,9 +384,12 @@ def AddNewHostsToCluster():
     
 def startbalancer():
     run("ceph mgr module enable balancer")
-    run("ceph config-key set mgr/balancer/max_misplaced .01")
-    run("ceph balancer mode crush-compat")
+    run("ceph config-key set mgr/balancer/max_misplaced .05")
+    run("ceph config-key set mgr/balancer/sleep_interval 10")
+    run("ceph osd set-require-min-compat-client luminous")
+    run("ceph balancer mode upmap")
     run("ceph balancer on")
+    run("(sh /tmp/stopbalancer.sh &> /dev/null < /dev/null &) && sleep 1 ", pty=False)
     print("ceph balancer started")
 
 def StartCephBalancer():
