@@ -327,10 +327,4 @@ ID CLASS WEIGHT  REWEIGHT SIZE    USE     AVAIL   %USE VAR  PGS
 MIN/MAX VAR: 0.05/1.35  STDDEV: 0.16
 ```
 这说明每个osd上的pg个数已经基本均匀了，根据经验，一般这个自动的数据均衡过程需要五分钟左右。
-在pg均匀了之后，最重要的一步是，我们需要手工关闭balancer，这一步必须要做。
-```
-ceph balancer off
-```
-
-
-
+在最新的版本中，会在脚本中创建一个名为volumes的pool，并根据osd的个数计算合适的pg个数，balancer会自动打开并在一个小时后自动关闭，因此无需用户手动关闭balancer了。
