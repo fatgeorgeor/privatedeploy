@@ -7,7 +7,7 @@
 - password: user用户的密码;
 - chronyservers: chrony服务器的ip地址;
 - disks: 配置每台服务器的盘符名称
-- isallflash: 配置是否是一个全闪集群, 如是则填true
+- isallflash: 配置是否是一个全闪集群(全闪是指所有数据盘都是ssd), 如是则填true, 如果是集群中的所有数据盘都是hdd，则填false.
 - shouldinstallpromethues: 是否要在服务器上安装监控组件
 典型的配置示例如下：
 ```
