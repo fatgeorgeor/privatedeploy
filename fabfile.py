@@ -21,7 +21,7 @@ import pdb
 # 5. All functions start with all_ are called on all nodes(monitors + osds).
 
 
-USERDEINEDCONFIG = {}
+USERDEFINEDCONFIG = {}
 USERHOME = os.getenv('HOME')
 SSHDIR = USERHOME + '/.ssh'
 SSHPRIFILE = SSHDIR + '/id_rsa'
@@ -76,8 +76,8 @@ def all_generateauth():
 
 def LoadConfig():
     config = loadConfiguration('config.json')
-    user = USERDEINEDCONFIG['user'] = config["user"]
-    password = USERDEINEDCONFIG['password'] = config["password"]
+    user = USERDEFINEDCONFIG['user'] = config["user"]
+    password = USERDEFINEDCONFIG['password'] = config["password"]
 
     env.roledefs['monitors'] = config["monitors"]
     env.roledefs['osds'] = config["osdnodes"]
@@ -92,16 +92,16 @@ def LoadConfig():
         print "please provide at lease one monitor"
         exit(-1)
 
-    USERDEINEDCONFIG['disks'] = config["disks"]
-    USERDEINEDCONFIG['chronyservers'] = config["chronyservers"]
-    USERDEINEDCONFIG['monitorhostnames'] = ''
-    USERDEINEDCONFIG['databasesize'] = config['databasesize']
-    USERDEINEDCONFIG['shouldinstallpromethues'] = config['shouldinstallpromethues']
+    USERDEFINEDCONFIG['disks'] = config["disks"]
+    USERDEFINEDCONFIG['chronyservers'] = config["chronyservers"]
+    USERDEFINEDCONFIG['monitorhostnames'] = ''
+    USERDEFINEDCONFIG['databasesize'] = config['databasesize']
+    USERDEFINEDCONFIG['shouldinstallpromethues'] = config['shouldinstallpromethues']
 
 def LoadExpandConfig():
     config = loadConfiguration('expand.json')
-    user = USERDEINEDCONFIG['user'] = config["user"]
-    password = USERDEINEDCONFIG['password'] = config["password"]
+    user = USERDEFINEDCONFIG['user'] = config["user"]
+    password = USERDEFINEDCONFIG['password'] = config["password"]
 
     env.roledefs['monitors'] = config["monitors"]
     env.roledefs['osds'] = config["newosdnodes"]
@@ -111,9 +111,9 @@ def LoadExpandConfig():
         print "please provide at lease one monitor"
         exit(-1)
 
-    USERDEINEDCONFIG['disks'] = config["disks"]
-    USERDEINEDCONFIG['chronyservers'] = config["chronyservers"]
-    USERDEINEDCONFIG['databasesize'] = config['databasesize']
+    USERDEFINEDCONFIG['disks'] = config["disks"]
+    USERDEFINEDCONFIG['chronyservers'] = config["chronyservers"]
+    USERDEFINEDCONFIG['databasesize'] = config['databasesize']
 
 moniphostnamedict = {}
 
@@ -123,19 +123,19 @@ def whoami():
 
 def ProcessMonitorHostname():
     for i in env.roledefs['monitors']:
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+        with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
             execute(whoami, host=i)
 
     local('cp /etc/hosts /tmp/hosts')
     local('cp resources/hosts /etc/hosts')
 
     for ip, hostname in moniphostnamedict.items():
-        USERDEINEDCONFIG['monitorhostnames'] += hostname + " "
+        USERDEFINEDCONFIG['monitorhostnames'] += hostname + " "
         local("echo %s %s >> /etc/hosts" % (ip, hostname))
 
 def Init():
     LoadConfig()
-    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+    with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
         execute(all_generateauth)
         execute(all_sshnopassword)
         with settings(warn_only=True):
@@ -148,8 +148,8 @@ def Init():
 @roles('osds')
 def osd_deployosds():
     with cd(DEPLOYDIR):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
-            for host, disks in USERDEINEDCONFIG['disks'].items():
+        with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
+            for host, disks in USERDEFINEDCONFIG['disks'].items():
                 if env.host == host:
                     ssds = disks['ssds']
                     hdds = disks['hdds']
@@ -171,7 +171,7 @@ def osd_deployosds():
                     for index, hdd in enumerate(hdds):
                         sudo('dd if=/dev/zero of=%s bs=128M count=1' % hdd)
                         ssd = ssds[index % ssdnum]
-                        sudo('sgdisk -n 0:0:+%dG %s' % (USERDEINEDCONFIG['databasesize'], ssd))
+                        sudo('sgdisk -n 0:0:+%dG %s' % (USERDEFINEDCONFIG['databasesize'], ssd))
                         sudo('sgdisk -n 0:0:+1G %s' % (ssd))
                         sudo('partprobe %s' % (ssd))
                         partitionmap[ssd] += 2
@@ -192,7 +192,7 @@ def osds_copydeployfiles():
     put("/etc/ceph/ceph.conf", DEPLOYDIR, use_sudo=True)
     
 def DeployOsds():
-    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+    with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
         execute(osds_makedeploydir)
         execute(osds_copydeployfiles)
         with settings(warn_only=True):
@@ -237,12 +237,12 @@ def local_createmonitorsandmgrs(mons):
     local("cp /tmp/hosts /etc/hosts")
 
 def CreateMonMgr():
-    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+    with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
         with settings(warn_only=True):
             execute(all_cleancephdatawithmercy)
         with cd(os.getcwd()):
-            execute(local_createmonitorsandmgrs, mons=USERDEINEDCONFIG['monitorhostnames'])
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+            execute(local_createmonitorsandmgrs, mons=USERDEFINEDCONFIG['monitorhostnames'])
+        with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
         	execute(all_copykeyring)
         	execute(all_copyconf)
 
@@ -329,7 +329,7 @@ def setChrony():
     #sudo('yum install chrony -y')
     sudo('sed -i "/server /d" /etc/chrony.conf')
 
-    for ip in USERDEINEDCONFIG['chronyservers']:
+    for ip in USERDEFINEDCONFIG['chronyservers']:
         append('/etc/chrony.conf', 'server %s iburst' % ip, use_sudo=True)
 
     sudo('systemctl enable chronyd')
@@ -337,7 +337,7 @@ def setChrony():
 
 def SetChronyServers():
     with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+        with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
             execute(setChrony)
 
 def getosdcount():
@@ -348,7 +348,7 @@ def getosdcount():
 def getdeployresult():
     totalosd, uposd, inosd = getosdcount()
     totaladdedosds = 0
-    for _, disks in USERDEINEDCONFIG['disks'].items():
+    for _, disks in USERDEFINEDCONFIG['disks'].items():
         hdds = disks['hdds']
         totaladdedosds += len(hdds)
 
@@ -372,7 +372,7 @@ def getexpandresult(onlyone):
     if onlyone:
         totaladdedosds = 1
     else:
-        for _, disks in USERDEINEDCONFIG['disks'].items():
+        for _, disks in USERDEFINEDCONFIG['disks'].items():
             hdds = disks['hdds']
             totaladdedosds += len(hdds)
 
@@ -384,7 +384,7 @@ def getexpandresult(onlyone):
 def CheckOsdCount():
     print "waiting for deploy results............"
     time.sleep(10)
-    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+    with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
         execute(getdeployresult, host=env.roledefs['monitors'][0])
 
 def expandgetosdcount():
@@ -392,13 +392,13 @@ def expandgetosdcount():
     ORIGINALTOTAL, ORIGINALUP, ORIGINALIN = getosdcount()
 
 def CheckOsdCountBeforeExpand():
-    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+    with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
         execute(expandgetosdcount, host=env.roledefs['monitors'][0])
 
 def CheckExpandResult(onlyone):
     print "waiting for expand results............"
     time.sleep(10)
-    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+    with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
         execute(getexpandresult, onlyone=onlyone, host=env.roledefs['monitors'][0])
 
 @parallel
@@ -417,7 +417,7 @@ def all_enablemonitoringservices():
 def DeployPrometheus():
     LoadConfig()
     with settings(warn_only=True):
-        with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+        with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
             execute(all_enablemonitoringservices)
 
     local("echo '  - job_name: \"ceph\"' >> /etc/prometheus/prometheus.yml")
@@ -444,7 +444,7 @@ def AddNewHostsToCluster():
     SetChronyServers()
     local("rm *keyring* -f")
     local("ceph-deploy gatherkeys " +  env.roledefs['monitors'][0])
-    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+    with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
         execute(all_generateauth)
         execute(all_sshnopassword)
         with settings(warn_only=True):
@@ -468,7 +468,7 @@ def startbalancer():
     print("ceph balancer started")
 
 def StartCephBalancer():
-    with settings(user=USERDEINEDCONFIG['user'], password=USERDEINEDCONFIG['password']):
+    with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
         execute(startbalancer, host=env.roledefs['monitors'][0])
 
 if __name__ == "__main__":
@@ -479,6 +479,6 @@ if __name__ == "__main__":
     DeployOsds()
     CheckOsdCount()
     StartCephBalancer()
-    if USERDEINEDCONFIG["shouldinstallpromethues"]:
+    if USERDEFINEDCONFIG["shouldinstallpromethues"]:
         CleanPrometheus()
         DeployPrometheus()
