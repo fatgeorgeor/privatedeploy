@@ -76,10 +76,10 @@ some osds is FAILED, please double check your configuration
 5、关于databasesize的计算准则
 为了提升ceph的性能，我们使用ssd来存储bluestore的rocksdb的db和wal，用hdd来存储osd的数据。因为ssd有限，所以我们  
 会将ssd划分为多个分区来使用。根据ceph官网的推荐，存储rocksdb的db的分区大小应至少达到hdd容量的4%，即一个6TB的hdd大概  
-需要对应240G的ssd空间来存储rocksdb的db, 另外还需要10GB来存储rocksdb的wal。  
+需要对应240G的ssd空间来存储rocksdb的db, 另外还需要1GB来存储rocksdb的wal。  
 在进行常规初始化部署和osd扩容时，都需要根据这个准则来计算databasesize.  
-比如在一个典型应用场景中，有两块896G的ssd和6块6T的HDD，那么每三个hdd需要共享一个ssd，首先，三个hdd需要占用3个10GB来存储  
-wal，剩下的ssd空间就是866GB, 存在rocksdb的db的空间就是866/3=288，也就是说databasesize应配置为288.
+比如在一个典型应用场景中，有两块896G的ssd和6块6T的HDD，那么每三个hdd需要共享一个ssd，首先，三个hdd需要占用3个1GB来存储  
+wal，剩下的ssd空间就是893GB, 存在rocksdb的db的空间就是893/3=297，也就是说databasesize应配置为297.
 
 6、批量扩容服务器:  
 **注意在运行中的集群中批量扩容服务器是一个非常危险的操作，可能会造成集群状态抖动和大量数据迁移，批量扩容服务器功能通常仅适合在一个负载很轻的集群或者在一个刚刚创建不久的集群中添加另外一批机器。扩容一个有一定负载的集群，请使用第4点钟提到的一个一个扩容osd。**  
@@ -183,14 +183,14 @@ sda                                                                             
   └─centos-home                                                                                       253:2    0 45.6G  0 lvm  /home
 vda                                                                                                   252:0    0  100G  0 disk
 ├─vda1                                                                                                252:1    0   40G  0 part
-└─vda2                                                                                                252:2    0   10G  0 part
+└─vda2                                                                                                252:2    0   1G  0 part
 vdb                                                                                                   252:16   0  100G  0 disk
 └─ceph--b4a80454--d5ea--440e--80a2--489b375c10e5-osd--block--1b416e79--3ef6--437e--a5d8--c3d95cc301d1 253:4    0  100G  0 lvm
 vdc                                                                                                   252:32   0  100G  0 disk
 ├─vdc1                                                                                                252:33   0   20G  0 part
-├─vdc2                                                                                                252:34   0   10G  0 part
+├─vdc2                                                                                                252:34   0   1G  0 part
 ├─vdc3                                                                                                252:35   0   20G  0 part
-└─vdc4                                                                                                252:36   0   10G  0 part
+└─vdc4                                                                                                252:36   0   1G  0 part
 vdd                                                                                                   252:48   0  100G  0 disk
 └─ceph--584dd760--e50d--45b9--af29--47a145e06075-osd--block--30211c4b--7ee8--4dca--8ca1--06dc54fd5eef 253:3    0  100G  0 lvm
 ```
@@ -240,14 +240,14 @@ sda                                                                             
   └─centos-home                                                                                       253:2    0 45.6G  0 lvm  /home
 vda                                                                                                   252:0    0  100G  0 disk
 ├─vda1                                                                                                252:1    0   40G  0 part
-└─vda2                                                                                                252:2    0   10G  0 part
+└─vda2                                                                                                252:2    0   1G  0 part
 vdb                                                                                                   252:16   0  100G  0 disk
 └─ceph--b4a80454--d5ea--440e--80a2--489b375c10e5-osd--block--1b416e79--3ef6--437e--a5d8--c3d95cc301d1 253:4    0  100G  0 lvm
 vdc                                                                                                   252:32   0  100G  0 disk
 ├─vdc1                                                                                                252:33   0   20G  0 part
-├─vdc2                                                                                                252:34   0   10G  0 part
+├─vdc2                                                                                                252:34   0   1G  0 part
 ├─vdc3                                                                                                252:35   0   20G  0 part
-└─vdc4                                                                                                252:36   0   10G  0 part
+└─vdc4                                                                                                252:36   0   1G  0 part
 vdd                                                                                                   252:48   0  100G  0 disk
 └─ceph--584dd760--e50d--45b9--af29--47a145e06075-osd--block--30211c4b--7ee8--4dca--8ca1--06dc54fd5eef 253:3    0  100G  0 lvm
 ```
@@ -269,12 +269,12 @@ ceph osd purge 2 --yes-i-really-mean-it
 ceph osd purge 5 --yes-i-really-mean-it
 ```
 四、插入新盘，得到其盘符假设为vde;  
-五、在vde上创建符合大小要求的分区供各个osd使用, 这里我们创建4个，大小分别是20G,10G,20G,10G，跟一开始的大小一致:  
+五、在vde上创建符合大小要求的分区供各个osd使用, 这里我们创建4个，大小分别是20G,1G,20G,1G，跟一开始的大小一致:  
 ```
 sgdisk -n 0:0:+20G /dev/vde
-sgdisk -n 0:0:+10G /dev/vde
+sgdisk -n 0:0:+1G /dev/vde
 sgdisk -n 0:0:+20G /dev/vde
-sgdisk -n 0:0:+10G /dev/vde
+sgdisk -n 0:0:+1G /dev/vde
 ```
 六、在vdb上添加一个新的osd:  
 ```
