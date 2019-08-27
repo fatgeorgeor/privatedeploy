@@ -31,6 +31,7 @@ DEPLOYDIR = '/opt/cephdeploy'
 ORIGINALTOTAL = 0
 ORIGINALUP = 0
 ORIGINALIN = 0
+MAXHDDPERSSD = 3
 
 
 def loadConfiguration(file):
@@ -95,8 +96,27 @@ def LoadConfig():
     USERDEFINEDCONFIG['disks'] = config["disks"]
     USERDEFINEDCONFIG['chronyservers'] = config["chronyservers"]
     USERDEFINEDCONFIG['monitorhostnames'] = ''
-    USERDEFINEDCONFIG['databasesize'] = config['databasesize']
     USERDEFINEDCONFIG['shouldinstallpromethues'] = config['shouldinstallpromethues']
+    USERDEFINEDCONFIG['diskpairs'] = {}
+
+    for ipdiskpair in config['disks']:
+        for ip in ipdiskpair['ips']:
+            diskpairs = {}
+            ssds=ipdiskpair["ssds"]
+            hdds=ipdiskpair["hdds"]
+            ssdnum = len(ssds)
+            for ssd in ssds:
+                diskpairs[ssd] = []
+            for index, hdd in enumerate(hdds):
+                #a ssd can support at most 3 hdds
+                if len(diskpairs[ssd]) >= 3:
+                    print('to many hdds for {}, hdds {} are ignored'.format(ip, hdds[index:]))
+                    break
+                ssd = ssds[index % ssdnum]
+                diskpairs[ssd].append(hdd)
+
+            USERDEFINEDCONFIG['diskpairs'][ip] = diskpairs
+            print(USERDEFINEDCONFIG['diskpairs'])
 
 def LoadExpandConfig():
     config = loadConfiguration('expand.json')
@@ -113,7 +133,26 @@ def LoadExpandConfig():
 
     USERDEFINEDCONFIG['disks'] = config["disks"]
     USERDEFINEDCONFIG['chronyservers'] = config["chronyservers"]
-    USERDEFINEDCONFIG['databasesize'] = config['databasesize']
+    USERDEFINEDCONFIG['diskpairs'] = {}
+
+    for ipdiskpair in config['disks']:
+        for ip in ipdiskpair['ips']:
+            diskpairs = {}
+            ssds=ipdiskpair["ssds"]
+            hdds=ipdiskpair["hdds"]
+            ssdnum = len(ssds)
+            for ssd in ssds:
+                diskpairs[ssd] = []
+            for index, hdd in enumerate(hdds):
+                #a ssd can support at most 3 hdds
+                if len(diskpairs[ssd]) >= 3:
+                    print('to many hdds for {}, hdds {} are ignored'.format(ip, hdds[index:]))
+                    break
+                ssd = ssds[index % ssdnum]
+                diskpairs[ssd].append(hdd)
+
+            USERDEFINEDCONFIG['diskpairs'][ip] = diskpairs
+            print(USERDEFINEDCONFIG['diskpairs'])
 
 moniphostnamedict = {}
 
@@ -149,36 +188,42 @@ def Init():
 def osd_deployosds():
     with cd(DEPLOYDIR):
         with settings(user=USERDEFINEDCONFIG['user'], password=USERDEFINEDCONFIG['password']):
-            for host, disks in USERDEFINEDCONFIG['disks'].items():
+            for host, diskpairs in USERDEFINEDCONFIG['diskpairs'].items():
+            #for host, disks in USERDEFINEDCONFIG['disks'].items():
                 if env.host == host:
-                    ssds = disks['ssds']
-                    hdds = disks['hdds']
-                    ssdnum = len(ssds)
-                    hddnum = len(hdds)
+                    for ssd, hdds in diskpairs.items():
+                        hddnum = len(hdds)
 
-                    if ssdnum < 1 or hddnum < 1:
-                        print "please provide at lease one ssd/hdd for host %s" % host
-                        exit(-1)
+                        ssdsize = int(sudo('blockdev --getsize64 %s' % ssd))
+                        totalhddsize = 0
+                        for hdd in hdds:
+                            totalhddsize += int(sudo('blockdev --getsize64 %s' % hdd))
+                        if totalhddsize > ssdsize * 26:
+                            print('no enough space for ssd')
+                            exit(-1)
 
-                    partitionmap = {}
-                    # clear patitions of every ssd
-                    for i in ssds + hdds:
-                        sudo('sgdisk -o %s' % i)
-                        sudo('partprobe %s' % i)
+                        walsize = 1073741824
+                        reserved_size = 536870912
+                        # prepare ssd space for MAXHDDPERSSD
+                        databasesize = (ssdsize -reserved_size - MAXHDDPERSSD * walsize) / MAXHDDPERSSD
+                        sudo('sgdisk -o %s' % ssd)
+                        # clear patitions of every disk
+                        for i in hdds:
+                            sudo('sgdisk -o %s' % i)
+                            sudo('partprobe %s' % i)
 
-                    for i in ssds:
-                        partitionmap[i] = 1
-                    for index, hdd in enumerate(hdds):
-                        sudo('dd if=/dev/zero of=%s bs=128M count=1' % hdd)
-                        ssd = ssds[index % ssdnum]
-                        sudo('sgdisk -n 0:0:+%dG %s' % (USERDEFINEDCONFIG['databasesize'], ssd))
-                        sudo('sgdisk -n 0:0:+1G %s' % (ssd))
-                        sudo('partprobe %s' % (ssd))
-                        partitionmap[ssd] += 2
-                        dbpath = ssd + "%s" % (partitionmap[ssd]-2)
-                        walpath = ssd + "%s" % (partitionmap[ssd]-1)
-                        run('ceph-deploy --overwrite-conf osd create --block-db %s --block-wal %s --data %s %s' % (dbpath, walpath, hdd, host))
-                    break
+                        partcounter = 1
+                        for index, hdd in enumerate(hdds):
+                            sudo('dd if=/dev/zero of=%s bs=128M count=1' % hdd)
+                            to_gigabyte = int(float(databasesize / (1024**3)))
+                            sudo('sgdisk -n 0:0:+%dG %s' % (to_gigabyte , ssd))
+                            sudo('sgdisk -n 0:0:+1G %s' % (ssd))
+                            sudo('partprobe %s' % (ssd))
+                            partcounter += 2
+                            dbpath = ssd + "%s" % (partcounter-2)
+                            walpath = ssd + "%s" % (partcounter-1)
+                            run('ceph-deploy --overwrite-conf osd create --block-db %s --block-wal %s --data %s %s' % (dbpath, walpath, hdd, host))
+                        break
 @parallel
 @roles('osds')
 def osds_makedeploydir():
@@ -303,23 +348,26 @@ def AddNewDisk(hostname, isfirstrun, ssd, hdd, databasesize, user, password):
     disks.append(hdd)
     
     if isfirstrun:
-        with settings(user=user, password=password):
-            with settings(warn_only=True):
-                execute(setChrony)
-                execute(all_generateauth)
-                execute(all_sshnopassword)
-                execute(all_systemconfig)
-                execute(all_copyscripts)
-                execute(all_cleancephdatawithmercy)
-                execute(all_copykeyring)
-                execute(cleardiskwhenfirstrun, disks=disks)
-                execute(osds_makedeploydir)
-                execute(osds_copydeployfiles)
+        if isfirstrun.lower() == 'true':
+            with settings(user=user, password=password):
+                with settings(warn_only=True):
+                    execute(setChrony)
+                    execute(all_generateauth)
+                    execute(all_sshnopassword)
+                    execute(all_systemconfig)
+                    execute(all_copyscripts)
+                    execute(all_cleancephdatawithmercy)
+                    execute(all_copykeyring)
+                    execute(cleardiskwhenfirstrun, disks=disks)
+                    execute(osds_makedeploydir)
+                    execute(osds_copydeployfiles)
+        else:
+            print("not first run on this node, we can add osd directly")
 
     with settings(warn_only=True):
             with settings(user=user, password=password):
                 with cd(DEPLOYDIR):
-                    execute(addOneOsd, ssd=ssd, hdd=hdd, databasesize=databasesize, host=hostname)
+                    execute(addOneOsd, ssd=ssd, hdd=hdd, databasesize=int(float(databasesize)), host=hostname)
     CheckExpandResult(True)
     
 @parallel
@@ -348,9 +396,9 @@ def getosdcount():
 def getdeployresult():
     totalosd, uposd, inosd = getosdcount()
     totaladdedosds = 0
-    for _, disks in USERDEFINEDCONFIG['disks'].items():
-        hdds = disks['hdds']
-        totaladdedosds += len(hdds)
+    for _, diskpairs in USERDEFINEDCONFIG['diskpairs'].items():
+        for _, hdds in diskpairs.items():
+            totaladdedosds += len(hdds)
 
     if totalosd == uposd == inosd == totaladdedosds:
         n = int((totalosd * 100) / 3.0)
@@ -372,9 +420,10 @@ def getexpandresult(onlyone):
     if onlyone:
         totaladdedosds = 1
     else:
-        for _, disks in USERDEFINEDCONFIG['disks'].items():
-            hdds = disks['hdds']
-            totaladdedosds += len(hdds)
+        for _, diskpairs in USERDEFINEDCONFIG['diskpairs'].items():
+            for _, hdds in diskpairs.items():
+                totaladdedosds += len(hdds)
+
 
     if totalosd-ORIGINALTOTAL == uposd-ORIGINALIN == inosd-ORIGINALUP == totaladdedosds:
         print ('\33[102m' +  "cluster expanded SUCCESSFULLY" + '\033[0m')

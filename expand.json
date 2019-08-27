@@ -1,20 +1,16 @@
 {
     "monitors": [
-        "172.20.13.171",
-        "172.20.13.172",
-        "172.20.13.173"
+        "172.20.13.245"
     ],
     "newosdnodes": [
-        "172.20.13.174"
+        "172.20.13.242"
     ],
     "user": "root",
-    "password": "1qaz@WSX",
+    "password": "123456",
     "chronyservers": ["51.75.17.219", "202.108.6.95"],
-    "databasesize": 40,
-    "disks": {
-        "172.20.13.174": {
-		"ssds": ["/dev/vda"],
-		"hdds": ["/dev/vdb"]
-	    }
-    }
+    "disks": [{
+            "ips": ["172.20.13.242"],
+             "ssds": ["/dev/vdm"],
+             "hdds": ["/dev/vdj", "/dev/vdk"]
+    }]
 }
