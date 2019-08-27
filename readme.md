@@ -1,10 +1,11 @@
 0、注意本版本之后的重大变更:  
-从此版本开始，在部署时，无需显示填写每个osd的databasesize，这个值由系统根据ssd和hdd的配比情况自动计算而来，计算的方式如下： 
+从此版本开始，在部署时，无需显示填写每个osd的databasesize，这个值由系统根据ssd和hdd的配比情况自动计算而来, 另外，  
 0.1 一个ssd最多匹配三个hdd，超过的hdd不会被部署，因为database不足的情况下，会影响osd的性能；  
 0.2 为考虑后续扩容，引入ssd预留机制：在部署osd时，会按照ssd:hdd=1:3的比例进行ssd的预留，比如一次只上线1个ssd和1个hdd，系统并不会将全部的ssd分配给这个hdd做database，而是只分配一个约1/3的ssd空间, 后续还可以继续扩容两个hdd；  
-0.3 处于成本考虑, 稍微放宽了database必须占到hdd大小的4%这个要求，在本版本中，只要ssd与hdd的容量比大于0.384即可。  
-0.4 后续硬件上线时，需要满足hdd总容量小于ssd总容量的25倍。
-1、安装ceph-common ceph-osd ceph-mon fabric ceph-deploy等包, 并给各台服务器配置各不相同的hostname;  
+0.3 处于成本考虑, 稍微放宽了database必须占到hdd大小的4%这个要求，在本版本中，只要ssd与hdd的容量比大于3.84%即可。  
+0.4 后续硬件上线时，需要满足hdd总容量小于ssd总容量的25倍。  
+
+1、安装ceph-common ceph-osd ceph-mon fabric ceph-deploy等包, 并给各台服务器配置各不相同的hostname;   
 2、配置config.json，包含的字段包括:
 - monitors: 一个数组，集群需要安装的monitor列表;
 - osdnodes: 一个数组，集群需要安装的osd服务器列表;
@@ -13,7 +14,7 @@
 - chronyservers: chrony服务器的ip地址;
 - disks: 配置服务器的ip, ssd和hdd盘符名称, 如果多台服务器的磁盘列表一致，则可以统一填在ips数组里。  
 - shouldinstallpromethues: 是否要在服务器上安装监控组件
-典型的配置示例如下：
+典型的配置示例如下：  
 ```
 {
     "monitors": [
@@ -74,9 +75,7 @@ some osds is FAILED, please double check your configuration
 ```
 
 5、关于databasesize的计算准则
-为了提升ceph的性能，我们使用ssd来存储bluestore的rocksdb的db和wal，用hdd来存储osd的数据。因为ssd有限，所以我们  
-会将ssd划分为多个分区来使用。根据ceph官网的推荐，存储rocksdb的db的分区大小应至少达到hdd容量的4%，即一个6TB的hdd大概  
-需要对应240G的ssd空间来存储rocksdb的db, 另外还需要1GB来存储rocksdb的wal。  
+为了提升ceph的性能，我们使用ssd来存储bluestore的rocksdb的db和wal，用hdd来存储osd的数据。因为ssd空间有限，所以我们会将ssd划分为多个分区来使用。根据ceph官网的推荐，存储rocksdb的db的分区大小应至少达到hdd容量的4%(本系统对这个要求适当放宽到3.84%)，即一个6TB的hdd大概需要对应240G的ssd空间来存储rocksdb的db, 另外还需要1GB来存储rocksdb的wal。  
 在进行常规初始化部署和osd扩容时，都需要根据这个准则来计算databasesize, 计算公式如下:   
 ```
 walsize = 1073741824
